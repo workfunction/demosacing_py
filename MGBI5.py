@@ -5,8 +5,8 @@ from numba import int64
 from numba import uint8
 
 spec = [
-    ('width', int64),               # a simple scalar field
-    ('height', int64),          # an array field
+    ('width', int64),
+    ('height', int64),
     ('outputWidth', int64),
     ('outputHeight', int64),
     ('inputImage', uint8[:, :]),
@@ -16,94 +16,6 @@ spec = [
 
 @jitclass(spec)
 class MGBI_5:
-    def DeltaHG(self, i, j):
-        return (self.inputImage[i, j] / 2) + (self.inputImage[i, j-2] / 4) + (self.inputImage[i, j+2] / 4) - (self.inputImage[i, j-1] / 2) - (self.inputImage[i, j+1] / 2)
-
-    def DeltaHRB(self, i, j):
-        return (self.inputImage[i, j-1] / 2) + (self.inputImage[i, j+1] / 2) - (self.inputImage[i, j-2] / 4) - (self.inputImage[i, j+2] / 4) - (self.inputImage[i, j] / 2)
-
-    def DeltaVG(self, i, j):
-        return (self.inputImage[i, j] / 2) + (self.inputImage[i-2, j] / 4) + (self.inputImage[i+2, j] / 4) - (self.inputImage[i-1, j] / 2) - (self.inputImage[i+1, j] / 2)
-
-    def DeltaVRB(self, i, j):
-        return (self.inputImage[i-1, j] / 2) + (self.inputImage[i+1, j] / 2) - (self.inputImage[i-2, j] / 4) - (self.inputImage[i+2, j] / 4) - (self.inputImage[i, j] / 2)
-
-    def DeltaH(self, i, j):
-        # 求水平色差 #                
-        if self.mode == 0:
-                    # 中 #
-            Delta_H0 = self.DeltaHG(i, j-1)
-            Delta_H1 = self.DeltaHRB(i, j)
-            Delta_H2 = self.DeltaHG(i, j+1)
-                    # 上 #
-            Delta_H3 = self.DeltaHG(i-2, j-1)
-            Delta_H4 = self.DeltaHRB(i-2, j)
-            Delta_H5 = self.DeltaHG(i-2, j+1)
-                    # 下 #
-            Delta_H6 = self.DeltaHG(i+2, j-1)
-            Delta_H7 = self.DeltaHRB(i+2, j)
-            Delta_H8 = self.DeltaHG(i+2, j+1)
-        else:
-                    # 中 #
-            Delta_H0 = self.DeltaHRB(i, j-1)
-            Delta_H1 = self.DeltaHG(i, j)
-            Delta_H2 = self.DeltaHRB(i, j+1)
-                    # 上 #
-            Delta_H3 = self.DeltaHRB(i-2, j-1)
-            Delta_H4 = self.DeltaHG(i-2, j)
-            Delta_H5 = self.DeltaHRB(i-2, j+1)
-                    # 下 #
-            Delta_H6 = self.DeltaHRB(i+2, j-1)
-            Delta_H7 = self.DeltaHG(i+2, j)
-            Delta_H8 = self.DeltaHRB(i+2, j+1)
-
-        Delta_H1_total = (Delta_H0 + 2 * Delta_H1 + Delta_H2) / 4
-        Delta_H2_total = (Delta_H3 + 2 * Delta_H4 + Delta_H5) / 4
-        Delta_H3_total = (Delta_H6 + 2 * Delta_H7 + Delta_H8) / 4
-
-        Delta_H_total = (Delta_H2_total + 2 * Delta_H1_total + Delta_H3_total) / 4
-        Dh_G = (abs(Delta_H3 - Delta_H5) + 2 * abs(Delta_H0 - Delta_H2) + abs(Delta_H6 - Delta_H8)) / 4
-
-        return Delta_H_total, Dh_G
-
-    def DeltaV(self, i, j):
-        # 求垂直色差
-        if self.mode == 0:
-                    # 中 #
-            Delta_V0 = self.DeltaVG(i-1, j)
-            Delta_V1 = self.DeltaVRB(i, j)
-            Delta_V2 = self.DeltaVG(i+1, j)
-                    # 左 #
-            Delta_V3 = self.DeltaVG(i-1, j-2)
-            Delta_V4 = self.DeltaVRB(i, j-2)
-            Delta_V5 = self.DeltaVG(i+1, j-2)
-                    #右 #
-            Delta_V6 = self.DeltaVG(i-1, j+2)
-            Delta_V7 = self.DeltaVRB(i, j+2)
-            Delta_V8 = self.DeltaVG(i+1, j+2)
-        else:
-                    # 中 #
-            Delta_V0 = self.DeltaVRB(i-1, j)
-            Delta_V1 = self.DeltaVG(i, j)
-            Delta_V2 = self.DeltaVRB(i+1, j)
-                    # 左 #
-            Delta_V3 = self.DeltaVRB(i-1, j-2)
-            Delta_V4 = self.DeltaVG(i, j-2)
-            Delta_V5 = self.DeltaVRB(i+1, j-2)
-                    #右 #
-            Delta_V6 = self.DeltaVRB(i-1, j+2)
-            Delta_V7 = self.DeltaVG(i, j+2)
-            Delta_V8 = self.DeltaVRB(i+1, j+2)
-
-        Delta_V1_total = (Delta_V0 + 2 * Delta_V1 + Delta_V2) / 4
-        Delta_V2_total = (Delta_V3 + 2 * Delta_V4 + Delta_V5) / 4
-        Delta_V3_total = (Delta_V6 + 2 * Delta_V7 + Delta_V8) / 4
-
-        Delta_V_total = (Delta_V2_total + 2 * Delta_V1_total + Delta_V3_total) / 4
-        Dv_G = (abs(Delta_V3 - Delta_V5) + 2 * abs(Delta_V0 - Delta_V2) + abs(Delta_V6 - Delta_V8)) / 4
-
-        return Delta_V_total, Dv_G
-
     def __init__(self, oriImage):
         self.width = oriImage.shape[1]
         self.height = oriImage.shape[0]
@@ -114,302 +26,226 @@ class MGBI_5:
         self.outputImage = np.zeros((self.outputHeight, self.outputWidth, 3), dtype=np.uint8)
         self.mode = 0
 
+    def _DeltaH(self, i, j, isGreen):
+        if isGreen == True:
+            return (self.inputImage[i, j] / 2) + (self.inputImage[i, j-2] / 4) +   \
+                (self.inputImage[i, j+2] / 4) - (self.inputImage[i, j-1] / 2) - \
+                (self.inputImage[i, j+1] / 2)
+        else:
+            return (self.inputImage[i, j-1] / 2) + (self.inputImage[i, j+1] / 2) - \
+                (self.inputImage[i, j-2] / 4) - (self.inputImage[i, j+2] / 4) - \
+                (self.inputImage[i, j] / 2)
+
+    def _DeltaV(self, i, j, isGreen):
+        if isGreen == True:
+            return (self.inputImage[i, j] / 2) + (self.inputImage[i-2, j] / 4) +   \
+                (self.inputImage[i+2, j] / 4) - (self.inputImage[i-1, j] / 2) - \
+                (self.inputImage[i+1, j] / 2)
+        else:
+            return (self.inputImage[i-1, j] / 2) + (self.inputImage[i+1, j] / 2) - \
+                (self.inputImage[i-2, j] / 4) - (self.inputImage[i+2, j] / 4) - \
+                (self.inputImage[i, j] / 2)
+
+    def DeltaH(self, i, j):
+        c0 = self.mode == 1 or self.mode == 2
+        c1 = not c0
+
+        # 求水平色差 #                
+                # 中 #
+        Delta_H0 = self._DeltaH(i, j-1, c1)
+        Delta_H1 = self._DeltaH(i, j, c0)
+        Delta_H2 = self._DeltaH(i, j+1, c1)
+        Delta_H20 = self._DeltaH(i, j+2, c0)
+                # 上 #
+        Delta_H3 = self._DeltaH(i-2, j-1, c1)
+        Delta_H4 = self._DeltaH(i-2, j, c0)
+        Delta_H5 = self._DeltaH(i-2, j+1, c1)
+        Delta_H50 = self._DeltaH(i-2, j+2, c0)
+                # 下 #
+        Delta_H6 = self._DeltaH(i+2, j-1, c1)
+        Delta_H7 = self._DeltaH(i+2, j, c0)
+        Delta_H8 = self._DeltaH(i+2, j+1, c1)
+        Delta_H80 = self._DeltaH(i+2, j+2, c0)
+
+        Delta_H1_total = (-0.125 * Delta_H0 + 0.625 * Delta_H1 + 0.625 * Delta_H2 -0.125 * Delta_H20)
+        Delta_H2_total = (-0.125 * Delta_H3 + 0.625 * Delta_H4 + 0.625 * Delta_H5 -0.125 * Delta_H50)
+        Delta_H3_total = (-0.125 * Delta_H6 + 0.625 * Delta_H7 + 0.625 * Delta_H8 -0.125 * Delta_H80)
+
+        Delta_H_total = (Delta_H2_total + 2 * Delta_H1_total + Delta_H3_total) / 4
+        Dh_G = (abs(Delta_H3 - Delta_H50) + 2 * abs(Delta_H0 - Delta_H20) + abs(Delta_H6 - Delta_H80)) / 4
+
+        return Delta_H_total, Dh_G
+
+    def DeltaV(self, i, j):
+        c0 = self.mode == 1 or self.mode == 2
+        c1 = not c0
+        
+        # 求垂直色差
+                # 中 #
+        Delta_V0 = self._DeltaV(i-1, j, c1)
+        Delta_V1 = self._DeltaV(i, j, c0)
+        Delta_V2 = self._DeltaV(i+1, j, c1)
+        Delta_V20 = self._DeltaV(i+2, j, c0)
+                # 左 #
+        Delta_V3 = self._DeltaV(i-1, j-2, c1)
+        Delta_V4 = self._DeltaV(i, j-2, c0)
+        Delta_V5 = self._DeltaV(i+1, j-2, c1)
+        Delta_V50 = self._DeltaV(i+2, j-2, c0)
+                #右 #
+        Delta_V6 = self._DeltaV(i-1, j+2, c1)
+        Delta_V7 = self._DeltaV(i, j+2, c0)
+        Delta_V8 = self._DeltaV(i+1, j+2, c1)
+        Delta_V80 = self._DeltaV(i+2, j+2, c0)
+
+        Delta_V1_total = (-0.125 * Delta_V0 + 0.625 * Delta_V1 + 0.625 * Delta_V2 -0.125 * Delta_V20)
+        Delta_V2_total = (-0.125 * Delta_V3 + 0.625 * Delta_V4 + 0.625 * Delta_V5 -0.125 * Delta_V50)
+        Delta_V3_total = (-0.125 * Delta_V6 + 0.625 * Delta_V7 + 0.625 * Delta_V8 -0.125 * Delta_V80)
+
+        Delta_V_total = (Delta_V2_total + 2 * Delta_V1_total + Delta_V3_total) / 4
+        Dv_G = (abs(Delta_V3 - Delta_V50) + 2 * abs(Delta_V0 - Delta_V20) + abs(Delta_V6 - Delta_V80)) / 4
+
+        return Delta_V_total, Dv_G
+
     def Algorithm(self):
         inputImage = self.inputImage
         outImage = self.outputImage
         for i in range(self.outputHeight - 7):
             for j in range(5, self.outputWidth - 5):
-                if i % 2 == 0: # even line B, G
-                    if j % 2 == 0: # even pixel B
-                        self.mode = 0
-                        # 補G #
 
-                            # 色差總和, 方向梯度 #
-                        Delta_H_total, Dh_G = self.DeltaH(i, j)
-                        Delta_V_total, Dv_G = self.DeltaV(i, j)
-                        
-                            # 插補出G #
-                        if Dv_G <= Dh_G:
-                            if Dv_G * 4 <= Dh_G:
-                                temp = inputImage[i, j] + Delta_V_total
-                            elif Dv_G * 2 <= Dh_G:
-                                temp = inputImage[i, j] + (3 * Delta_V_total + Delta_H_total) / 4
-                            else:
-                                temp = inputImage[i, j] + (Delta_V_total + Delta_H_total) / 2
-                        else:
-                            if Dh_G * 4 <= Dv_G:
-                                temp = inputImage[i, j] + Delta_H_total
-                            elif Dh_G * 2 <= Dv_G:
-                                temp = inputImage[i, j] + (3 * Delta_H_total + Delta_V_total) / 4
-                            else:
-                                temp = inputImage[i, j] + (Delta_H_total + Delta_V_total) / 2
-
-                        outImage[i, j, 1] = 255 if temp > 255 else 0 if temp < 0 else temp
-
-                        # 補G #
-                        # 補RB #
-                            # 估計尚未插補的G值 #
-                                # 左上 #
-                        Delta_H0 = self.DeltaHRB(i-1, j-1)
-                        Delta_V0 = self.DeltaVRB(i-1, j-1)
-                                # 右上 #
-                        Delta_H1 = self.DeltaHRB(i-1, j+1)
-                        Delta_V1 = self.DeltaVRB(i-1, j+1)
-                                # 左下 #
-                        Delta_H2 = self.DeltaHRB(i+1, j-1)
-                        Delta_V2 = self.DeltaVRB(i+1, j-1)
-                                # 右下 #
-                        Delta_H3 = self.DeltaHRB(i+1, j+1)
-                        Delta_V3 = self.DeltaVRB(i+1, j+1)
-
-                        Delta_H_total = (Delta_H0 + Delta_H1 + Delta_H2 + Delta_H3) / 4
-                        Delta_V_total = (Delta_V0 + Delta_V1 + Delta_V2 + Delta_V3) / 4
-                        Dh_O = (abs(Delta_H0 - Delta_H1) + abs(Delta_H2 - Delta_H3)) / 2
-                        Dv_O = (abs(Delta_V0 - Delta_V2) + abs(Delta_V1 - Delta_V3)) / 2
-
-                        if Dv_O <= Dh_O:
-                            if Dv_O * 4 <= Dh_O:
-                                temp = outImage[i, j, 1] - Delta_V_total
-                            elif Dv_O * 2 <= Dh_O:
-                                temp = outImage[i, j, 1] - (3 * Delta_V_total + Delta_H_total) / 4
-                            else:
-                                temp = outImage[i, j, 1] - (Delta_V_total + Delta_H_total) / 2
-                        
-                        else:
-                        
-                            if Dh_O * 4 <= Dv_O:
-                                temp = outImage[i, j, 1] - Delta_H_total
-                            elif Dh_O * 2 <= Dv_O:
-                                temp = outImage[i, j, 1] - (3 * Delta_H_total + Delta_V_total) / 4
-                            else:
-                                temp = outImage[i, j, 1] - (Delta_H_total + Delta_V_total) / 2
-                        
-
-                        outImage[i, j, 0] = 255 if temp > 255 else 0 if temp < 0 else temp
-                        outImage[i, j, 2] = inputImage[i, j]
-                        # 補RB #
-                    
-                    else:           #  odd pixel G
-                        self.mode = 1
-                        # 補G 上 RB #
-                            # 估計B的G值 #
-                                # 左 #
-                        Delta_H1 = self.DeltaHRB(i, j-1)
-                        Delta_V1 = self.DeltaVRB(i, j-1)
-                                # 右 #
-                        Delta_H2 = self.DeltaHRB(i, j+1)
-                        Delta_V2 = self.DeltaVRB(i, j+1)
-
-                        Delta_H1_total = (Delta_H1 + Delta_H2) / 2
-                        Delta_V1_total = (Delta_V1 + Delta_V2) / 2
-
-                        if Dv_G <= Dh_G:
-                        
-                            if Dv_G * 4 <= Dh_G:
-                                temp = inputImage[i, j] - Delta_V1_total
-                            elif Dv_G * 2 <= Dh_G:
-                                temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
-                        
-                        else:
-                        
-                            if Dh_G * 4 <= Dv_G:
-                                temp = inputImage[i, j] - Delta_H1_total
-                            elif Dh_G * 2 <= Dv_G:
-                                temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
-                        
-                        outImage[i, j, 2] = 255 if temp > 255 else 0 if temp < 0 else temp
-                        
-                            # 估計R的G值 #
-                                # 上 #
-                        GH1 = inputImage[i - 1, j] + ((inputImage[i - 1, j - 1] + inputImage[i - 1, j + 1]) / 2 - (inputImage[i - 1, j] * 2 + inputImage[i - 1, j - 2] + inputImage[i - 1, j + 2]) / 4)
-                        GV1 = inputImage[i - 1, j] + ((inputImage[i, j] + inputImage[i - 2, j]) / 2 - (inputImage[i - 1, j] * 2 + inputImage[i + 1, j] + inputImage[i - 1, j]) / 4)
-                        Delta_H1 = GH1 - inputImage[i - 1, j]
-                        Delta_V1 = GV1 - inputImage[i - 1, j]
-                                # 下 #
-                        GH2 = inputImage[i + 1, j] + ((inputImage[i + 1, j - 1] + inputImage[i + 1, j + 1]) / 2 - (inputImage[i + 1, j] * 2 + inputImage[i + 1, j - 2] + inputImage[i + 1, j + 2]) / 4)
-                        GV2 = inputImage[i + 1, j] + ((inputImage[i, j] + inputImage[i + 2, j]) / 2 - (inputImage[i + 1, j] * 2 + inputImage[i - 1, j] + inputImage[i + 1, j]) / 4)
-                        Delta_H2 = GH2 - inputImage[i + 1, j]
-                        Delta_V2 = GV2 - inputImage[i + 1, j]
-
-                        Delta_H1_total = (Delta_H1 + Delta_H2) / 2
-                        Delta_V1_total = (Delta_V1 + Delta_V2) / 2
-
-                        if Dv_G <= Dh_G:
-                        
-                            if Dv_G * 4 <= Dh_G:
-                                temp = inputImage[i, j] - Delta_V1_total
-                            elif Dv_G * 2 <= Dh_G:
-                                temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
-                        
-                        else:
-                        
-                            if Dh_G * 4 <= Dv_G:
-                                temp = inputImage[i, j] - Delta_H1_total
-                            elif Dh_G * 2 <= Dv_G:
-                                temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
-                        
-                        outImage[i, j, 0] = 255 if temp > 255 else 0 if temp < 0 else temp
-                        outImage[i, j, 1] = inputImage[i, j]
-                        # 補G 上 RB #
-                    
+                '''
+                * mode 0: |B| G   * mode 1: |G| B
+                           G  R              R  G
                 
-                else:        # odd line G, R
+                * mode 2: |G| R   * mode 3: |R| G
+                           B  G              G  B
+                '''
+                self.mode = int(i % 2) * 2 + int(j % 2)
+
+                if self.mode == 0 or self.mode == 3:
+                    # 補G #
+                        # 色差總和, 方向梯度 #
+                    Delta_H_total, Dh_G = self.DeltaH(i, j)
+                    Delta_V_total, Dv_G = self.DeltaV(i, j)
                     
-                    if j % 2 == 0: # even pixel G
-                        self.mode = 1
-                        # 補G 上 RB #
-                            # 估計R的G值 #
-                                # 左 #
-                        GH1 = inputImage[i, j - 1] + ((inputImage[i, j - 2] + inputImage[i, j]) / 2 - (inputImage[i, j - 1] * 2 + inputImage[i, j - 3] + inputImage[i, j + 1]) / 4)
-                        GV1 = inputImage[i, j - 1] + ((inputImage[i - 1, j - 1] + inputImage[i + 1, j - 1]) / 2 - (2 * inputImage[i, j - 1] + inputImage[i - 2, j - 1] + inputImage[i + 2, j - 1]) / 4)
-                        Delta_H1 = GH1 - inputImage[i, j - 1]
-                        Delta_V1 = GV1 - inputImage[i, j - 1]
-                                # 右 #
-                        GH2 = inputImage[i, j + 1] + ((inputImage[i, j] + inputImage[i, j + 2]) / 2 - (inputImage[i, j + 1] * 2 + inputImage[i, j - 1] + inputImage[i, j + 3]) / 4)
-                        GV2 = inputImage[i, j + 1] + ((inputImage[i - 1, j + 1] + inputImage[i + 1, j + 1]) / 2 - (2 * inputImage[i, j + 1] + inputImage[i - 2, j + 1] + inputImage[i + 2, j + 1]) / 4)
-                        Delta_H2 = GH2 - inputImage[i, j + 1]
-                        Delta_V2 = GV2 - inputImage[i, j + 1]
-
-                        Delta_H1_total = (Delta_H1 + Delta_H2) / 2
-                        Delta_V1_total = (Delta_V1 + Delta_V2) / 2
-
-                        if Dv_G <= Dh_G:
-                        
-                            if Dv_G * 4 <= Dh_G:
-                                temp = inputImage[i, j] - Delta_V1_total
-                            elif Dv_G * 2 <= Dh_G:
-                                temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
-                        
+                        # 插補出G #
+                    if Dv_G <= Dh_G:
+                        if Dv_G * 4 <= Dh_G:
+                            temp = inputImage[i, j] + Delta_V_total
+                        elif Dv_G * 2 <= Dh_G:
+                            temp = inputImage[i, j] + (3 * Delta_V_total + Delta_H_total) / 4
                         else:
-                        
-                            if Dh_G * 4 <= Dv_G:
-                                temp = inputImage[i, j] - Delta_H1_total
-                            elif Dh_G * 2 <= Dv_G:
-                                temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
-                        
-                        outImage[i, j, 0] = 255 if temp > 255 else 0 if temp < 0 else temp
-
-                            # 估計B的G值 #
-                                # 上 #
-                        GH1 = inputImage[i - 1, j] + ((inputImage[i - 1, j - 1] + inputImage[i - 1, j + 1]) / 2 - (inputImage[i - 1, j] * 2 + inputImage[i - 1, j - 2] + inputImage[i - 1, j + 2]) / 4)
-                        GV1 = inputImage[i - 1, j] + ((inputImage[i, j] + inputImage[i - 2, j]) / 2 - (inputImage[i - 1, j] * 2 + inputImage[i + 1, j] + inputImage[i - 1, j]) / 4)
-                        Delta_H1 = GH1 - inputImage[i - 1, j]
-                        Delta_V1 = GV1 - inputImage[i - 1, j]
-                                # 下 #
-                        GH2 = inputImage[i + 1, j] + ((inputImage[i + 1, j - 1] + inputImage[i + 1, j + 1]) / 2 - (inputImage[i + 1, j] * 2 + inputImage[i + 1, j - 2] + inputImage[i + 1 , j + 2]) / 4)
-                        GV2 = inputImage[i + 1, j] + ((inputImage[i, j] + inputImage[i + 2, j]) / 2 - (inputImage[i + 1, j] * 2 + inputImage[i - 1, j] + inputImage[i + 1, j]) / 4)
-                        Delta_H2 = GH2 - inputImage[i + 1, j]
-                        Delta_V2 = GV2 - inputImage[i + 1, j]
-
-                        Delta_H1_total = (Delta_H1 + Delta_H2) / 2
-                        Delta_V1_total = (Delta_V1 + Delta_V2) / 2
-
-                        if Dv_G <= Dh_G:
-                        
-                            if Dv_G * 4 <= Dh_G:
-                                temp = inputImage[i, j] - Delta_V1_total
-                            elif Dv_G * 2 <= Dh_G:
-                                temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
-                        
+                            temp = inputImage[i, j] + (Delta_V_total + Delta_H_total) / 2
+                    else:
+                        if Dh_G * 4 <= Dv_G:
+                            temp = inputImage[i, j] + Delta_H_total
+                        elif Dh_G * 2 <= Dv_G:
+                            temp = inputImage[i, j] + (3 * Delta_H_total + Delta_V_total) / 4
                         else:
-                        
-                            if Dh_G * 4 <= Dv_G:
-                                temp = inputImage[i, j] - Delta_H1_total
-                            elif Dh_G * 2 <= Dv_G:
-                                temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
-                            else:
-                                temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
-                        
+                            temp = inputImage[i, j] + (Delta_H_total + Delta_V_total) / 2
 
-                        
-                        outImage[i, j, 2] = 255 if temp > 255 else 0 if temp < 0 else temp
-                        outImage[i, j, 1] = inputImage[i, j]
-                        # 補G 上 RB #
+                    outImage[i, j, 1] = 255 if temp > 255 else 0 if temp < 0 else temp
+
+                    # 補G #
+                    # 補RB #
+                        # 估計尚未插補的G值 #
+                            # 左上 #
+                    Delta_H0 = self._DeltaH(i-1, j-1, False)
+                    Delta_V0 = self._DeltaV(i-1, j-1, False)
+                            # 右上 #
+                    Delta_H1 = self._DeltaH(i-1, j+1, False)
+                    Delta_V1 = self._DeltaV(i-1, j+1, False)
+                            # 左下 #
+                    Delta_H2 = self._DeltaH(i+1, j-1, False)
+                    Delta_V2 = self._DeltaV(i+1, j-1, False)
+                            # 右下 #
+                    Delta_H3 = self._DeltaH(i+1, j+1, False)
+                    Delta_V3 = self._DeltaV(i+1, j+1, False)
+
+                    Delta_H_total = (Delta_H0 + Delta_H1 + Delta_H2 + Delta_H3) / 4
+                    Delta_V_total = (Delta_V0 + Delta_V1 + Delta_V2 + Delta_V3) / 4
+                    Dh_O = (abs(Delta_H0 - Delta_H1) + abs(Delta_H2 - Delta_H3)) / 2
+                    Dv_O = (abs(Delta_V0 - Delta_V2) + abs(Delta_V1 - Delta_V3)) / 2
+
+                    if Dv_O <= Dh_O:
+                        if Dv_O * 4 <= Dh_O:
+                            temp = outImage[i, j, 1] - Delta_V_total
+                        elif Dv_O * 2 <= Dh_O:
+                            temp = outImage[i, j, 1] - (3 * Delta_V_total + Delta_H_total) / 4
+                        else:
+                            temp = outImage[i, j, 1] - (Delta_V_total + Delta_H_total) / 2
                     
-                    else:           #  odd pixel R
-                        self.mode = 0
-                        # 補G #
-                        Delta_H_total, Dh_G = self.DeltaH(i, j)
-                        Delta_V_total, Dv_G = self.DeltaV(i, j)
-
-                            # 差補出G #
-                        if Dv_G <= Dh_G:
-                        
-                            if Dv_G * 4 <= Dh_G:
-                                temp = inputImage[i, j] + Delta_V_total
-                            elif Dv_G * 2 <= Dh_G:
-                                temp = inputImage[i, j] + (3 * Delta_V_total + Delta_H_total) / 4
-                            else:
-                                temp = inputImage[i, j] + (Delta_V_total + Delta_H_total) / 2
-                        
+                    else:
+                        if Dh_O * 4 <= Dv_O:
+                            temp = outImage[i, j, 1] - Delta_H_total
+                        elif Dh_O * 2 <= Dv_O:
+                            temp = outImage[i, j, 1] - (3 * Delta_H_total + Delta_V_total) / 4
                         else:
-                        
-                            if Dh_G * 4 <= Dv_G:
-                                temp = inputImage[i, j] + Delta_H_total
-                            elif Dh_G * 2 <= Dv_G:
-                                temp = inputImage[i, j] + (3 * Delta_H_total + Delta_V_total) / 4
-                            else:
-                                temp = inputImage[i, j] + (Delta_H_total + Delta_V_total) / 2
-                        
-                        outImage[i, j, 1] = 255 if temp > 255 else 0 if temp < 0 else temp
-                        # 補G #
-                        # 補RB #
-                            # 估計尚未插補的G值 #
-                                # 左上 #
-                        Delta_H0 = self.DeltaHRB(i-1, j-1)
-                        Delta_V0 = self.DeltaVRB(i-1, j-1)
-                                # 右上 #
-                        Delta_H1 = self.DeltaHRB(i-1, j+1)
-                        Delta_V1 = self.DeltaVRB(i-1, j+1)
-                                # 左下 #
-                        Delta_H2 = self.DeltaHRB(i+1, j-1)
-                        Delta_V2 = self.DeltaVRB(i+1, j-1)
-                                # 右下 #
-                        Delta_H3 = self.DeltaHRB(i+1, j+1)
-                        Delta_V3 = self.DeltaVRB(i+1, j+1)
+                            temp = outImage[i, j, 1] - (Delta_H_total + Delta_V_total) / 2                    
 
-                        Delta_H_total = (Delta_H0 + Delta_H1 + Delta_H2 + Delta_H3) / 4
-                        Delta_V_total = (Delta_V0 + Delta_V1 + Delta_V2 + Delta_V3) / 4
+                    outImage[i, j, (0 if self.mode == 0 else 2)] = 255 if temp > 255 else 0 if temp < 0 else temp
+                    outImage[i, j, (2 if self.mode == 0 else 0)] = inputImage[i, j]
+                    # 補RB #
+                    
+                else:           #  odd pixel G
+                    # 補G 上 RB #
+                        # 估計B的G值 #
+                            # 左 #
+                    Delta_H1 = self._DeltaH(i, j-1, False)
+                    Delta_V1 = self._DeltaV(i, j-1, False)
+                            # 右 #
+                    Delta_H2 = self._DeltaH(i, j+1, False)
+                    Delta_V2 = self._DeltaV(i, j+1, False)
 
-                        Dh_O = (abs(Delta_H0 - Delta_H1) + abs(Delta_H2 - Delta_H3)) / 2
-                        Dv_O = (abs(Delta_V0 - Delta_V2) + abs(Delta_V1 - Delta_V3)) / 2
+                    Delta_H1_total = (Delta_H1 + Delta_H2) / 2
+                    Delta_V1_total = (Delta_V1 + Delta_V2) / 2
 
-                        if Dv_O <= Dh_O:
-                        
-                            if Dv_O * 4 <= Dh_O:
-                                temp = outImage[i, j, 1] - Delta_V_total
-                            elif Dv_O * 2 <= Dh_O:
-                                temp = outImage[i, j, 1] - (3 * Delta_V_total + Delta_H_total) / 4
-                            else:
-                                temp = outImage[i, j, 1] - (Delta_V_total + Delta_H_total) / 2
-                        
+                    if Dv_G <= Dh_G:                    
+                        if Dv_G * 4 <= Dh_G:
+                            temp = inputImage[i, j] - Delta_V1_total
+                        elif Dv_G * 2 <= Dh_G:
+                            temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
                         else:
-                        
-                            if Dh_O * 4 <= Dv_O:
-                                temp = outImage[i, j, 1] - Delta_H_total
-                            elif Dh_O * 2 <= Dv_O:
-                                temp = outImage[i, j, 1] - (3 * Delta_H_total + Delta_V_total) / 4
-                            else:
-                                temp = outImage[i, j, 1] - (Delta_H_total + Delta_V_total) / 2
-                        
+                            temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
+                    
+                    else:                    
+                        if Dh_G * 4 <= Dv_G:
+                            temp = inputImage[i, j] - Delta_H1_total
+                        elif Dh_G * 2 <= Dv_G:
+                            temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
+                        else:
+                            temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
+                    
+                    outImage[i, j, (2 if self.mode == 1 else 0)] = 255 if temp > 255 else 0 if temp < 0 else temp
+                    
+                        # 估計R的G值 #
+                            # 上 #
+                    Delta_H1 = self._DeltaH(i-1, j, False)
+                    Delta_V1 = self._DeltaV(i-1, j, False)
+                            # 下 #
+                    Delta_H2 = self._DeltaH(i+1, j, False)
+                    Delta_V2 = self._DeltaV(i+1, j, False)
 
-                        outImage[i, j, 2] = 255 if temp > 255 else 0 if temp < 0 else temp
-                        outImage[i, j, 0] = inputImage[i, j]
-                        # 補RB #
+                    Delta_H1_total = (Delta_H1 + Delta_H2) / 2
+                    Delta_V1_total = (Delta_V1 + Delta_V2) / 2
+
+                    if Dv_G <= Dh_G:                    
+                        if Dv_G * 4 <= Dh_G:
+                            temp = inputImage[i, j] - Delta_V1_total
+                        elif Dv_G * 2 <= Dh_G:
+                            temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
+                        else:
+                            temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
+                    
+                    else:                    
+                        if Dh_G * 4 <= Dv_G:
+                            temp = inputImage[i, j] - Delta_H1_total
+                        elif Dh_G * 2 <= Dv_G:
+                            temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
+                        else:
+                            temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
+                    
+                    outImage[i, j, (0 if self.mode == 1 else 2)] = 255 if temp > 255 else 0 if temp < 0 else temp
+                    outImage[i, j, 1] = inputImage[i, j]
+                    # 補G 上 RB #
+
         return outImage
-
-    
