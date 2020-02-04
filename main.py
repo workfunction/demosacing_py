@@ -1,15 +1,16 @@
-from mepi import MEPI
-from mepi_delta import MEPR
-from mosaic import Mosaic
-from MGBI5 import MGBI_5
-import numpy as np
-from PIL import Image
-from matplotlib import pyplot as plt
-import math
-import tensorflow as tf
 import sys
 import os
+import math
 
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+
+from PIL import Image
+from lib.mepi import MEPI
+from lib.mepi_delta import MEPR
+from lib.mosaic import Mosaic
+from lib.MGBI5 import MGBI_5
 
 def read_img(img):
 	return tf.convert_to_tensor(img, dtype=np.uint8)
