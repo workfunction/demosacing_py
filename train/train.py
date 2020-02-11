@@ -23,8 +23,8 @@ class Train():
             self.model = tf.keras.models.load_model(self.filepath)
         else:
             assert type(data) is Data, "No model file or no input data"
-            self.__test_train(e_num, data.train_label, data.train_data,
-                              index, data.count)
+            self.__test_train(e_num, data.train_label0, data.train_data0,
+                              index, data.count0)
     
     def __test_train(self, e_num, train_label, train_data, index, count):
         self.model = Sequential()
@@ -55,5 +55,3 @@ class Train():
             if len(h[0]) == 6:            
                 for i in range(6):
                     print("*vc"+str(i)+" =",h[0][i][0][0],";")
-                for i in range(6):
-                    print("*vc"+str(i)+" =",h[0][5-i][0][0],";")

@@ -3,9 +3,8 @@ from train.train import Train
 
 def main():
     position_index = 0
-    RGB_index = 1
     
-    data = Data(position_index, RGB_index)
+    data = Data(position_index)
     data.save()
     
     dataload = Data()

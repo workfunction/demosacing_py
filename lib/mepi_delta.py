@@ -7,7 +7,7 @@ spec = [
     ('outputWidth', nb.int64),
     ('outputHeight', nb.int64),
     ('inputImage', nb.uint8[:, :]),
-    ('outputImage', nb.uint8[:, :, :]),
+    ('outputImage', nb.int16[:, :, :]),
     ('scale', nb.float64),
     ('mode', nb.uint8),
 ]
@@ -22,7 +22,7 @@ class MEPR:
         self.outputWidth = int(self.width * scale)
         self.outputHeight = int(self.height * scale)
         self.inputImage = np.copy(oriImage)
-        self.outputImage = np.zeros((self.outputHeight, self.outputWidth, 2), dtype=np.uint8)
+        self.outputImage = np.zeros((self.outputHeight, self.outputWidth, 2), dtype=np.int16)
         
     def weight_cal(self, vs):
         gamma = 2
@@ -171,15 +171,42 @@ class MEPR:
                     Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, False)
                     Delta_V_C0, Dv_C0 = self.DeltaV(i, j+1, dy, 1-dx, False)
                     
-                Delta_C0 = (Delta_V_C0 * Dh_C0 + Delta_H_C0 * Dv_C0) / (Dh_C0 + Dv_C0)
-                Delta_C1 = (Delta_V_C1 * Dh_C1 + Delta_H_C1 * Dv_C1) / (Dh_C1 + Dv_C1)
+                if Dv_C0 <= Dh_C0:
+                    if Dv_C0 * 4 <= Dh_C0:
+                        Delta_C0 = Delta_V_C0
+                    elif Dv_C0 * 2 <= Dh_C0:
+                        Delta_C0 = (3 * Delta_V_C0 + Delta_H_C0) / 4
+                    else:
+                        Delta_C0 = (Delta_V_C0 + Delta_H_C0) / 2
+                else:
+                    if Dh_C0 * 4 <= Dv_C0:
+                        Delta_C0 = Delta_H_C0
+                    elif Dh_C0 * 2 <= Dv_C0:
+                        Delta_C0 = (3 * Delta_H_C0 + Delta_V_C0) / 4
+                    else:
+                        Delta_C0 = (Delta_H_C0 + Delta_V_C0) / 2
+                
+                if Dv_C1 <= Dh_C1:
+                    if Dv_C1 * 4 <= Dh_C1:
+                        Delta_C1 = Delta_V_C1
+                    elif Dv_C1 * 2 <= Dh_C1:
+                        Delta_C1 = (3 * Delta_V_C1 + Delta_H_C1) / 4
+                    else:
+                        Delta_C1 = (Delta_V_C1 + Delta_H_C1) / 2
+                else:
+                    if Dh_C1 * 4 <= Dv_C1:
+                        Delta_C1 = Delta_H_C1
+                    elif Dh_C1 * 2 <= Dv_C1:
+                        Delta_C1 = (3 * Delta_H_C1 + Delta_V_C1) / 4
+                    else:
+                        Delta_C1 = (Delta_H_C1 + Delta_V_C1) / 2
                 
                 if self.mode == 0 or self.mode == 1:
-                    self.outputImage[oy, ox, 1] = (Delta_C0 + 255) / 2
-                    self.outputImage[oy, ox, 0] = (Delta_C1 + 255) / 2
+                    self.outputImage[oy, ox, 1] = Delta_C0
+                    self.outputImage[oy, ox, 0] = Delta_C1
                 else:
-                    self.outputImage[oy, ox, 0] = (Delta_C0 + 255) / 2
-                    self.outputImage[oy, ox, 1] = (Delta_C1 + 255) / 2                                    
+                    self.outputImage[oy, ox, 0] = Delta_C0
+                    self.outputImage[oy, ox, 1] = Delta_C1                             
 
         return self.outputImage
         

@@ -38,7 +38,7 @@ def main():
     mos = Mosaic(image, im.width, im.height)
     mimage = mos.Algorithm()
 
-    epi = MEPR(mimage, 2)
+    epi = MEPI(mimage, 2)
     out = epi.Algorithm()
 
     #plt.imshow(out, cmap='gray', vmin=0, vmax=255)
@@ -51,8 +51,8 @@ def main():
     #out[-3:, :, :] = oimage[-3:, :, :]
     #out[:, -3:, :] = oimage[:, -3:, :]
 
-    plt.imshow(out[...,1], cmap='gray', vmin=0, vmax=255)
-    #plt.imshow(out)
+    #plt.imshow(out[...,1], cmap='gray', vmin=0, vmax=255)
+    plt.imshow(out)
     plt.show()
 
     im = Image.fromarray(out)
@@ -62,7 +62,7 @@ def main():
     p = do_psnr(read_img(oimage), read_img(out))
     print(p)
     #im.save("result/kodim01.png")
-    f = open("demofile2.txt", "a")
+    f = open("result/demofile2.txt", "a")
     f.write(os.path.basename(filename) + ": " + str(p) + "\n")
     f.close()
 
