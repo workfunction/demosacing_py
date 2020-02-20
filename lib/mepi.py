@@ -51,7 +51,7 @@ class MEPI:
 
         return np.array([vc0, vc1, vc2])
 
-    def _DeltaH(self, i, j, isGreen):
+    def _DeltaH(self, i, j, isGreen=False):
         if isGreen == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i, j-2] / 4) +   \
                 (self.inputImage[i, j+2] / 4) - (self.inputImage[i, j-1] / 2) - \
@@ -61,7 +61,7 @@ class MEPI:
                 (self.inputImage[i, j-2] / 4) - (self.inputImage[i, j+2] / 4) - \
                 (self.inputImage[i, j] / 2)
 
-    def _DeltaV(self, i, j, isGreen):
+    def _DeltaV(self, i, j, isGreen=False):
         if isGreen == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i-2, j] / 4) +   \
                 (self.inputImage[i+2, j] / 4) - (self.inputImage[i-1, j] / 2) - \
@@ -71,12 +71,12 @@ class MEPI:
                 (self.inputImage[i-2, j] / 4) - (self.inputImage[i+2, j] / 4) - \
                 (self.inputImage[i, j] / 2)
 
-    def DeltaH(self, i, j, dx, dy, isGreen, offset=0):
-        delta = np.zeros((4, 4))
+    def DeltaH(self, i, j, dx, dy, isGreen, ioffset=0, joffset=0):
+        delta = np.empty((4, 4))
 
         for m in range(4):
             for n in range(4):
-                delta[m, n] = self._DeltaH(i+(m-offset-1)*2, j+(n-offset-1), isGreen==bool((n-offset)%2))
+                delta[m, n] = self._DeltaH(i+(m-ioffset-1)*2, j+(n-joffset-1), isGreen==bool((n-joffset)%2))
 
         a = self.weight_cal(dx)
         b = self.weight_cal(dy/2)
@@ -87,12 +87,12 @@ class MEPI:
 
         return Delta_H_total, Dh_G
 
-    def DeltaV(self, i, j, dy, dx, isGreen, offset=0):
-        delta = np.zeros((4, 4))
+    def DeltaV(self, i, j, dy, dx, isGreen, ioffset=0, joffset=0):
+        delta = np.empty((4, 4))
 
         for m in range(4):
             for n in range(4):
-                delta[m,n] = self._DeltaV(i+(n-offset-1), j+(m-offset-1)*2, isGreen==bool((n-offset)%2))
+                delta[m,n] = self._DeltaV(i+(n-ioffset-1), j+(m-joffset-1)*2, isGreen==bool((n-ioffset)%2))
         
         a = self.weight_cal(dy)
         b = self.weight_cal(dx/2)
@@ -102,6 +102,22 @@ class MEPI:
         Dv_G = np.dot(np.abs(delta[:, 0] - delta[:, 3]), np.array([1/8,3/8,3/8,1/8]))
 
         return Delta_V_total, Dv_G
+    
+    def getDelta(self, dh, dv, gh, gv):
+        if gv <= gh:
+            if gv * 4 <= gh:
+                return dv
+            elif gv * 2 <= gh:
+                return (3 * dv + dh) / 4
+            else:
+                return (dv + dh) / 2
+        else:
+            if gh * 4 <= gv:
+                return dh
+            elif gh * 2 <= gv:
+                return (3 * dh + dv) / 4
+            else:
+                return (dh + dv) / 2
 
     def Algorithm(self):
         scale_factor_h = 0.5 #scale_factor_h的倒數 
@@ -130,45 +146,18 @@ class MEPI:
                     Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy, False)
                     Delta_V_C0, Dv_C0 = self.DeltaV(i, j, dy, dx, False)                
 
-                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j+1, 1-dx, 1-dy, False, 1)
-                    Delta_V_C1, Dv_C1 = self.DeltaV(i+1, j+1, 1-dy, 1-dx, False, 1)                
+                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, True, 0, 1)
+                    Delta_V_C1, Dv_C1 = self.DeltaV(i, j+1, dy, 1-dx, True, 1, 0)                
                 
                 else:
                     Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy, True)
                     Delta_V_C1, Dv_C1 = self.DeltaV(i, j, dy, dx, True)                
 
-                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j+1, 1-dx, 1-dy, True, 1)
-                    Delta_V_C0, Dv_C0 = self.DeltaV(i+1, j+1, 1-dy, 1-dx, True, 1)
-                    
-                if Dv_C0 <= Dh_C0:
-                    if Dv_C0 * 4 <= Dh_C0:
-                        Delta_C0 = Delta_V_C0
-                    elif Dv_C0 * 2 <= Dh_C0:
-                        Delta_C0 = (3 * Delta_V_C0 + Delta_H_C0) / 4
-                    else:
-                        Delta_C0 = (Delta_V_C0 + Delta_H_C0) / 2
-                else:
-                    if Dh_C0 * 4 <= Dv_C0:
-                        Delta_C0 = Delta_H_C0
-                    elif Dh_C0 * 2 <= Dv_C0:
-                        Delta_C0 = (3 * Delta_H_C0 + Delta_V_C0) / 4
-                    else:
-                        Delta_C0 = (Delta_H_C0 + Delta_V_C0) / 2
+                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, False, 0, 1)
+                    Delta_V_C0, Dv_C0 = self.DeltaV(i, j+1, dy, 1-dx, False, 1, 0)
                 
-                if Dv_C1 <= Dh_C1:
-                    if Dv_C1 * 4 <= Dh_C1:
-                        Delta_C1 = Delta_V_C1
-                    elif Dv_C1 * 2 <= Dh_C1:
-                        Delta_C1 = (3 * Delta_V_C1 + Delta_H_C1) / 4
-                    else:
-                        Delta_C1 = (Delta_V_C1 + Delta_H_C1) / 2
-                else:
-                    if Dh_C1 * 4 <= Dv_C1:
-                        Delta_C1 = Delta_H_C1
-                    elif Dh_C1 * 2 <= Dv_C1:
-                        Delta_C1 = (3 * Delta_H_C1 + Delta_V_C1) / 4
-                    else:
-                        Delta_C1 = (Delta_H_C1 + Delta_V_C1) / 2
+                Delta_C0 = self.getDelta(Delta_H_C0, Delta_V_C0, Dh_C0, Dv_C0)
+                Delta_C1 = self.getDelta(Delta_H_C1, Delta_V_C1, Dh_C1, Dv_C1)
 
                 a = self.weight_cal(dy)
                 b = self.weight_cal(dx)
@@ -180,7 +169,7 @@ class MEPI:
                     det = np.array([[Delta_C1, 0 ,Delta_C1, 0],
                                     [0, Delta_C0, 0, Delta_C0],
                                     [Delta_C1, 0 ,Delta_C1, 0],
-                                    [0, Delta_C0, 0, Delta_C0]], dtype=nb.float64)
+                                    [0, Delta_C0, 0, Delta_C0]], dtype=nb.float64)  
                 else:
                     det = np.array([[0 ,Delta_C1, 0, Delta_C1],
                                     [Delta_C0, 0, Delta_C0, 0],
@@ -191,8 +180,7 @@ class MEPI:
                 temp = np.dot(a.reshape(1,4), float_arr)
                 epi  = np.dot(temp, b)
                 
-                tempG = np.sum(epi) #+ Delta_C0*w_c1 + Delta_C1*w_c0
-                tempG = 255 if tempG > 255 else 0 if tempG < 0 else int(tempG)
+                tempG = np.sum(epi)
                 
                 if self.mode == 0:
                     tempB = tempG - Delta_C0
@@ -211,9 +199,9 @@ class MEPI:
                     tempG = 0
                     tempB = 0
 
-                self.outputImage[oy, ox, 1] = tempG
-                self.outputImage[oy, ox, 0] = 255 if tempR > 255 else 0 if tempR < 0 else tempR
-                self.outputImage[oy, ox, 2] = 255 if tempB > 255 else 0 if tempB < 0 else tempB
+                self.outputImage[oy, ox, 1] = 255 if tempG > 255 else 0 if tempG < 0 else int(tempG)
+                self.outputImage[oy, ox, 0] = 255 if tempR > 255 else 0 if tempR < 0 else int(tempR)
+                self.outputImage[oy, ox, 2] = 255 if tempB > 255 else 0 if tempB < 0 else int(tempB)
                                     
 
         return self.outputImage
