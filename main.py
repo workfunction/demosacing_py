@@ -7,6 +7,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+import multiprocessing as mp
 
 from PIL import Image
 from lib.mepi import MEPI
@@ -15,12 +16,12 @@ from lib.mosaic import Mosaic
 from lib.MGBI5 import MGBI_5
 from lib.mgepi import MGEPI
 
-crop = True
-edge = 10
-save = True
-show = False
-showG = False
-postfix = "_2x"
+CROP = True
+EDGE = 10
+SAVE = True
+SHOW = True
+SHOWG = False
+POST = "_2x"
 
 def read_img(img):
 	return tf.convert_to_tensor(img, dtype=np.uint8)
@@ -29,7 +30,60 @@ def read_img(img):
 def do_psnr(tf_img1, tf_img2):
 	return tf.image.psnr(tf_img1, tf_img2, max_val=255)
 
+def run(path):
+    global CROP, EDGE, SAVE, SHOW, SHOWG, POST
+    
+    oim = Image.open(path)
+
+    w = oim.size[0]
+    h = oim.size[1]
+    if (w % 2) == 1:
+        w = w - 1
+    if (h % 2) == 1:
+        h = h - 1
+    im1 = oim.crop((0, 0, w, h))        
+    oimage = np.array(im1, dtype=np.uint8)
+    
+    new_dimension = (int(w/2), int(h/2))        
+    im = im1.resize(new_dimension, Image.BICUBIC)
+    image = np.array(im, dtype=np.uint8)
+
+    mos = Mosaic(image, im.width, im.height)
+    mimage = mos.Algorithm()
+
+    epi = MEPI(mimage, 2)
+    out = epi.Algorithm()
+    
+    if CROP == False:
+        #補原圖
+        out[:EDGE, :, :] = oimage[:EDGE, :, :]
+        out[:, :EDGE, :] = oimage[:, :EDGE, :]
+        out[-1*EDGE:, :, :] = oimage[-1*EDGE:, :, :]
+        out[:, -1*EDGE:, :] = oimage[:, -1*EDGE:, :]
+    else:
+        #裁減
+        out = out[EDGE:-1*EDGE, EDGE:-1*EDGE, :]
+        oimage = oimage[EDGE:-1*EDGE, EDGE:-1*EDGE, :]
+
+    if SHOW == True:
+        if SHOWG == True:
+            plt.imshow(out[...,1], cmap='gray', vmin=0, vmax=255)
+        else:
+            plt.imshow(out)
+        plt.show()
+
+    filename, ext = os.path.splitext(path)
+    if SAVE == True:
+        im = Image.fromarray(out)
+        im.save("result/" + os.path.basename(filename) + POST + ext)
+
+    p = float(do_psnr(read_img(oimage), read_img(out)))
+    s = os.path.basename(filename) + ": " + str(p)
+    print(s)
+    return [p, (s + "\n")]
+
 def main():
+    global SHOW
     if len(sys.argv) != 3:
         print("No input file!")
         return -1
@@ -48,61 +102,20 @@ def main():
     print(*files, sep="\n")
     print("============================")
     
-    a = []
+    num_cores = mp.cpu_count()
+    if len(files) > 1:
+        SHOW = False
+    
+    pool = mp.Pool(processes=(num_cores if len(files) > num_cores else len(files)))
+    ss = np.array(pool.map(run, files)) 
+    pool.close()  
+    pool.join()
+    
     f = open("result/demofile2.txt", "w")
-    for path in files:
-        oim = Image.open(path)
-
-        w = oim.size[0]
-        h = oim.size[1]
-        if (w % 2) == 1:
-            w = w - 1
-        if (h % 2) == 1:
-            h = h - 1
-        im1 = oim.crop((0, 0, w, h))        
-        oimage = np.array(im1, dtype=np.uint8)
-        
-        new_dimension = (int(w/2), int(h/2))        
-        im = im1.resize(new_dimension, Image.BICUBIC)
-        image = np.array(im, dtype=np.uint8)
-
-        mos = Mosaic(image, im.width, im.height)
-        mimage = mos.Algorithm()
-
-        epi = MEPI(mimage, 2)
-        out = epi.Algorithm()
-        
-        if crop == False:
-            #補原圖
-            out[:edge, :, :] = oimage[:edge, :, :]
-            out[:, :edge, :] = oimage[:, :edge, :]
-            out[-1*edge:, :, :] = oimage[-1*edge:, :, :]
-            out[:, -1*edge:, :] = oimage[:, -1*edge:, :]
-        else:
-            #裁減
-            out = out[edge:-1*edge, edge:-1*edge, :]
-            oimage = oimage[edge:-1*edge, edge:-1*edge, :]
-
-        if show == True:
-            if showG == True:
-                plt.imshow(out[...,1], cmap='gray', vmin=0, vmax=255)
-            else:
-                plt.imshow(out)
-            plt.show()
-
-        filename, ext = os.path.splitext(path)
-        if save == True:
-            im = Image.fromarray(out)
-            im.save("result/" + os.path.basename(filename) + postfix + ext)
-
-        p = float(do_psnr(read_img(oimage), read_img(out)))
-        a.append(p)
-        s = os.path.basename(filename) + ": " + str(p)
-        print(s)
-        f.write(s + "\n")
-        
+    f.writelines(ss[:,1])
     f.close()
-    print("AVG = " + str(np.average(a)))
+    n = ss[:,0].astype("float")
+    print("AVG = " + str(np.average(n)))
 
 if __name__ == "__main__":
     main()
