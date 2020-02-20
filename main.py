@@ -19,7 +19,8 @@ crop = True
 edge = 10
 save = True
 show = False
-pref = "_2x"
+showG = False
+postfix = "_2x"
 
 def read_img(img):
 	return tf.convert_to_tensor(img, dtype=np.uint8)
@@ -47,6 +48,7 @@ def main():
     print(*files, sep="\n")
     print("============================")
     
+    a = []
     f = open("result/demofile2.txt", "w")
     for path in files:
         oim = Image.open(path)
@@ -82,20 +84,25 @@ def main():
             oimage = oimage[edge:-1*edge, edge:-1*edge, :]
 
         if show == True:
-            #plt.imshow(out[...,1], cmap='gray', vmin=0, vmax=255)
-            plt.imshow(out)
+            if showG == True:
+                plt.imshow(out[...,1], cmap='gray', vmin=0, vmax=255)
+            else:
+                plt.imshow(out)
             plt.show()
 
         filename, ext = os.path.splitext(path)
         if save == True:
             im = Image.fromarray(out)
-            im.save("result/" + os.path.basename(filename) + pref + ext)
+            im.save("result/" + os.path.basename(filename) + postfix + ext)
 
         p = float(do_psnr(read_img(oimage), read_img(out)))
+        a.append(p)
         s = os.path.basename(filename) + ": " + str(p)
         print(s)
         f.write(s + "\n")
+        
     f.close()
+    print("AVG = " + str(np.average(a)))
 
 if __name__ == "__main__":
     main()
