@@ -36,7 +36,7 @@ class MEPR:
         vc0 = (-1)*vc0
         vc3 = (-1)*vc3
 
-        return vc0, vc1, vc2, vc3
+        return np.array([vc0, vc1, vc2, vc3])
     
     def weight_cal3(self, d):
         r = 4 + d * 4 - d * d
@@ -44,9 +44,9 @@ class MEPR:
         vc0 = (d * (2 + d))/r
         vc2 = (d * (2 - d))/r
 
-        return vc0, vc1, vc2
+        return np.array([vc0, vc1, vc2])
 
-    def _DeltaH(self, i, j, isGreen):
+    def _DeltaH(self, i, j, isGreen=False):
         if isGreen == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i, j-2] / 4) +   \
                 (self.inputImage[i, j+2] / 4) - (self.inputImage[i, j-1] / 2) - \
@@ -56,7 +56,7 @@ class MEPR:
                 (self.inputImage[i, j-2] / 4) - (self.inputImage[i, j+2] / 4) - \
                 (self.inputImage[i, j] / 2)
 
-    def _DeltaV(self, i, j, isGreen):
+    def _DeltaV(self, i, j, isGreen=False):
         if isGreen == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i-2, j] / 4) +   \
                 (self.inputImage[i+2, j] / 4) - (self.inputImage[i-1, j] / 2) - \
@@ -65,74 +65,54 @@ class MEPR:
             return (self.inputImage[i-1, j] / 2) + (self.inputImage[i+1, j] / 2) - \
                 (self.inputImage[i-2, j] / 4) - (self.inputImage[i+2, j] / 4) - \
                 (self.inputImage[i, j] / 2)
-                
-    def DeltaH(self, i, j, dx, dy, isGreen):
-        c0 = isGreen
-        c1 = not c0
 
-        # 求水平色差 #                
-                # 中 #
-        Delta_H0 = self._DeltaH(i, j-1, c1)
-        Delta_H1 = self._DeltaH(i, j, c0)
-        Delta_H2 = self._DeltaH(i, j+1, c1)
-        Delta_H3 = self._DeltaH(i, j+2, c0)
-                # 上 #
-        Delta_H4 = self._DeltaH(i-2, j-1, c1)
-        Delta_H5 = self._DeltaH(i-2, j, c0)
-        Delta_H6 = self._DeltaH(i-2, j+1, c1)
-        Delta_H7 = self._DeltaH(i-2, j+2, c0)
-                # 下 #
-        Delta_H8 = self._DeltaH(i+2, j-1, c1)
-        Delta_H9 = self._DeltaH(i+2, j, c0)
-        Delta_H10 = self._DeltaH(i+2, j+1, c1)
-        Delta_H11 = self._DeltaH(i+2, j+2, c0)
+    def DeltaH(self, i, j, dx, dy, isGreen, ioffset=0, joffset=0):
+        delta = np.empty((4, 4))
 
-        a0, a1, a2, a3 = self.weight_cal(dx)
+        for m in range(4):
+            for n in range(4):
+                delta[m, n] = self._DeltaH(i+(m-ioffset-1)*2, j+(n-joffset-1), isGreen==bool((n-joffset)%2))
 
-        Delta_H1_total = (a0 * Delta_H0 + a1 * Delta_H1 + a2 * Delta_H2 + a3 * Delta_H3)
-        Delta_H2_total = (a0 * Delta_H4 + a1 * Delta_H5 + a2 * Delta_H6 + a3 * Delta_H7)
-        Delta_H3_total = (a0 * Delta_H8 + a1 * Delta_H9 + a2 * Delta_H10 + a3 * Delta_H11)
+        a = self.weight_cal(dx)
+        b = self.weight_cal(dy/2)
 
-        b0, b1, b2 = self.weight_cal3(dy)
-
-        Delta_H_total = b0 * Delta_H2_total + b1 * Delta_H1_total + b2 * Delta_H3_total  
-        Dh_G = (abs(Delta_H4 - Delta_H7) + 2 * abs(Delta_H0 - Delta_H3) + abs(Delta_H8 - Delta_H11)) / 4
+        delta_total = np.dot(delta, a)
+        Delta_H_total = np.dot(delta_total, b)
+        Dh_G = np.dot(np.abs(delta[:, 0] - delta[:, 3]), np.array([1/8,3/8,3/8,1/8]))
 
         return Delta_H_total, Dh_G
 
-    def DeltaV(self, i, j, dy, dx, isGreen):
-        c0 = isGreen
-        c1 = not c0
+    def DeltaV(self, i, j, dy, dx, isGreen, ioffset=0, joffset=0):
+        delta = np.empty((4, 4))
 
-        # 求垂直色差
-                # 中 #
-        Delta_V0 = self._DeltaV(i-1, j, c1)
-        Delta_V1 = self._DeltaV(i, j, c0)
-        Delta_V2 = self._DeltaV(i+1, j, c1)
-        Delta_V3 = self._DeltaV(i+2, j, c0)
-                # 左 #
-        Delta_V4 = self._DeltaV(i-1, j-2, c1)
-        Delta_V5 = self._DeltaV(i, j-2, c0)
-        Delta_V6 = self._DeltaV(i+1, j-2, c1)
-        Delta_V7 = self._DeltaV(i+2, j-2, c0)
-                #右 #
-        Delta_V8 = self._DeltaV(i-1, j+2, c1)
-        Delta_V9 = self._DeltaV(i, j+2, c0)
-        Delta_V10 = self._DeltaV(i+1, j+2, c1)
-        Delta_V11 = self._DeltaV(i+2, j+2, c0)
-
-        a0, a1, a2, a3 = self.weight_cal(dy)
-
-        Delta_V1_total = (a0 * Delta_V0 + a1 * Delta_V1 + a2 * Delta_V2 + a3 * Delta_V3)
-        Delta_V2_total = (a0 * Delta_V4 + a1 * Delta_V5 + a2 * Delta_V6 + a3 * Delta_V7)
-        Delta_V3_total = (a0 * Delta_V8 + a1 * Delta_V9 + a2 * Delta_V10 + a3 * Delta_V11)
-
-        b0, b1, b2 = self.weight_cal3(dx)
-
-        Delta_V_total = (b0 * Delta_V2_total + b1 * Delta_V1_total + b2 * Delta_V3_total)
-        Dv_G = (abs(Delta_V4 - Delta_V7) + 2 * abs(Delta_V0 - Delta_V3) + abs(Delta_V8 - Delta_V11)) / 4
+        for m in range(4):
+            for n in range(4):
+                delta[m,n] = self._DeltaV(i+(n-ioffset-1), j+(m-joffset-1)*2, isGreen==bool((n-ioffset)%2))
+        
+        a = self.weight_cal(dy)
+        b = self.weight_cal(dx/2)
+        
+        delta_total = np.dot(delta, a)
+        Delta_V_total = np.dot(delta_total, b)
+        Dv_G = np.dot(np.abs(delta[:, 0] - delta[:, 3]), np.array([1/8,3/8,3/8,1/8]))
 
         return Delta_V_total, Dv_G
+    
+    def getDelta(self, dh, dv, gh, gv):
+        if gv <= gh:
+            if gv * 4 <= gh:
+                return dv
+            elif gv * 2 <= gh:
+                return (3 * dv + dh) / 4
+            else:
+                return (dv + dh) / 2
+        else:
+            if gh * 4 <= gv:
+                return dh
+            elif gh * 2 <= gv:
+                return (3 * dh + dv) / 4
+            else:
+                return (dh + dv) / 2
 
     def Algorithm(self):
         scale_factor_h = 0.5 #scale_factor_h的倒數 
@@ -171,35 +151,8 @@ class MEPR:
                     Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, False)
                     Delta_V_C0, Dv_C0 = self.DeltaV(i, j+1, dy, 1-dx, False)
                     
-                if Dv_C0 <= Dh_C0:
-                    if Dv_C0 * 4 <= Dh_C0:
-                        Delta_C0 = Delta_V_C0
-                    elif Dv_C0 * 2 <= Dh_C0:
-                        Delta_C0 = (3 * Delta_V_C0 + Delta_H_C0) / 4
-                    else:
-                        Delta_C0 = (Delta_V_C0 + Delta_H_C0) / 2
-                else:
-                    if Dh_C0 * 4 <= Dv_C0:
-                        Delta_C0 = Delta_H_C0
-                    elif Dh_C0 * 2 <= Dv_C0:
-                        Delta_C0 = (3 * Delta_H_C0 + Delta_V_C0) / 4
-                    else:
-                        Delta_C0 = (Delta_H_C0 + Delta_V_C0) / 2
-                
-                if Dv_C1 <= Dh_C1:
-                    if Dv_C1 * 4 <= Dh_C1:
-                        Delta_C1 = Delta_V_C1
-                    elif Dv_C1 * 2 <= Dh_C1:
-                        Delta_C1 = (3 * Delta_V_C1 + Delta_H_C1) / 4
-                    else:
-                        Delta_C1 = (Delta_V_C1 + Delta_H_C1) / 2
-                else:
-                    if Dh_C1 * 4 <= Dv_C1:
-                        Delta_C1 = Delta_H_C1
-                    elif Dh_C1 * 2 <= Dv_C1:
-                        Delta_C1 = (3 * Delta_H_C1 + Delta_V_C1) / 4
-                    else:
-                        Delta_C1 = (Delta_H_C1 + Delta_V_C1) / 2
+                Delta_C0 = self.getDelta(Delta_H_C0, Delta_V_C0, Dh_C0, Dv_C0)
+                Delta_C1 = self.getDelta(Delta_H_C1, Delta_V_C1, Dh_C1, Dv_C1)
                 
                 if self.mode == 0 or self.mode == 1:
                     self.outputImage[oy, ox, 1] = Delta_C0

@@ -22,6 +22,7 @@ SAVE = True
 SHOW = True
 SHOWG = False
 POST = "_2x"
+DELT = False
 
 def read_img(img):
 	return tf.convert_to_tensor(img, dtype=np.uint8)
@@ -51,7 +52,13 @@ def run(path):
     mos = Mosaic(image, im.width, im.height)
     mimage = mos.Algorithm()
 
-    epi = MEPI(mimage, 2)
+    if DELT == True:
+        epi = MEPR(mimage, 2)
+        SHOW = True
+        SHOWG = True
+        SAVE = False
+    else:
+        epi = MEPI(mimage, 2)
     out = epi.Algorithm()
     
     if CROP == False:
@@ -67,7 +74,12 @@ def run(path):
 
     if SHOW == True:
         if SHOWG == True:
-            plt.imshow(out[...,1], cmap='gray', vmin=0, vmax=255)
+            if DELT == True:
+                plt.imshow(out[...,0], cmap='hsv', vmin=-255, vmax=255)
+            else:
+                plt.imshow(out[...,1], cmap='hsv', vmin=0, vmax=255)
+            plt.show()
+            assert False
         else:
             plt.imshow(out)
         plt.show()
@@ -83,7 +95,7 @@ def run(path):
     return [p, (s + "\n")]
 
 def main():
-    global SHOW
+    global SHOW, DELT
     if len(sys.argv) != 3:
         print("No input file!")
         return -1
@@ -105,6 +117,7 @@ def main():
     num_cores = mp.cpu_count()
     if len(files) > 1:
         SHOW = False
+        DELT = False
     
     pool = mp.Pool(processes=(num_cores if len(files) > num_cores else len(files)))
     ss = np.array(pool.map(run, files)) 

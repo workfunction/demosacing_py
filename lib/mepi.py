@@ -146,15 +146,15 @@ class MEPI:
                     Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy, False)
                     Delta_V_C0, Dv_C0 = self.DeltaV(i, j, dy, dx, False)                
 
-                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, True, 0, 1)
-                    Delta_V_C1, Dv_C1 = self.DeltaV(i, j+1, dy, 1-dx, True, 1, 0)                
+                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, True, joffset=1)
+                    Delta_V_C1, Dv_C1 = self.DeltaV(i, j+1, dy, 1-dx, True, ioffset=1)                
                 
                 else:
                     Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy, True)
                     Delta_V_C1, Dv_C1 = self.DeltaV(i, j, dy, dx, True)                
 
-                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, False, 0, 1)
-                    Delta_V_C0, Dv_C0 = self.DeltaV(i, j+1, dy, 1-dx, False, 1, 0)
+                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, False, joffset=1)
+                    Delta_V_C0, Dv_C0 = self.DeltaV(i, j+1, dy, 1-dx, False, ioffset=1)
                 
                 Delta_C0 = self.getDelta(Delta_H_C0, Delta_V_C0, Dh_C0, Dv_C0)
                 Delta_C1 = self.getDelta(Delta_H_C1, Delta_V_C1, Dh_C1, Dv_C1)
