@@ -11,7 +11,6 @@ import multiprocessing as mp
 
 from PIL import Image
 from lib.mepi import MEPI
-from lib.mepi_delta import MEPR
 from lib.mosaic import Mosaic
 from lib.MGBI5 import MGBI_5
 from lib.mgepi import MGEPI
@@ -53,13 +52,14 @@ def run(path):
     mimage = mos.Algorithm()
 
     if DELT == True:
-        epi = MEPR(mimage, 2)
+        epi = MEPI(mimage, 2)
+        out = epi.Delta()
         SHOW = True
         SHOWG = True
         SAVE = False
     else:
         epi = MEPI(mimage, 2)
-    out = epi.Algorithm()
+        out = epi.Algorithm()
     
     if CROP == False:
         #補原圖
