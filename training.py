@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 from train.data import Data
 from train.train import Train
 

@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 import sys
 import os
 import math
@@ -12,6 +14,7 @@ import multiprocessing as mp
 
 from PIL import Image
 from lib.mepi import MEPI
+from lib.mepi_legacy import MEPL
 from lib.mosaic import Mosaic
 from lib.MGBI5 import MGBI_5
 from lib.mgepi import MGEPI
@@ -116,8 +119,9 @@ def main():
         with open('config.json', 'w') as f:
             f.writelines(json.dumps(config, sort_keys = True, indent = 4))            
     
-    with open('config.json', 'r') as f:
-        config = json.load(f)
+    else:
+        with open('config.json', 'r') as f:
+            config = json.load(f)
     
     num_cores = mp.cpu_count()
     if len(files) > 1:

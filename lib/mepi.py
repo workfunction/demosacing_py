@@ -28,8 +28,7 @@ class MEPI:
     def is_green(self, i, j):
         return (i%2) != (j%2)
 
-    def weight_cal(self, vs):
-        gamma = 1.5
+    def weight_cal(self, vs, gamma=1.5):
         x_gamma = gamma/2
         
         tmp = (1-vs)
@@ -77,6 +76,12 @@ class MEPI:
             return np.array([weight[0], 0, weight[1], 0, weight[2], 0, weight[3], 0])
         
     def getDelta(self, dh, dv, gh, gv):
+        s = gh + gv
+        if s == 0:
+            return dh
+        return (gh * dv + gv * dh) / s
+        
+    def _getDelta(self, dh, dv, gh, gv):
         if gv <= gh:
             if gv * 4 <= gh:
                 return dv
@@ -102,7 +107,7 @@ class MEPI:
                 deltaV[m+3, n+1] = self._DeltaV(i+n, j+m)
 
         weight_h = self.weight_cal(dx)
-        weight_v = self.weight_cal(dy/2)
+        weight_v = self.weight_cal(dy/2, gamma=1)
 
         deltaH_first = np.dot(deltaH, weight_h)
         deltaH_C0 = np.dot(deltaH_first, self.color_weight(weight_v, False))
@@ -111,7 +116,7 @@ class MEPI:
         Dh_C0 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
         Dh_C1 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
         
-        weight_h = self.weight_cal(dx/2)
+        weight_h = self.weight_cal(dx/2, gamma=1)
         weight_v = self.weight_cal(dy)
         
         deltaV_first = np.dot(deltaV, weight_v)
@@ -130,16 +135,18 @@ class MEPI:
         
         Delta_C0 = self.getDelta(deltaH_C0, deltaV_C0, Dh_C0, Dv_C0)
         Delta_C1 = self.getDelta(deltaH_C1, deltaV_C1, Dh_C1, Dv_C1)
+        s = Dh_C1 + Dv_C1 + Dh_C0 + Dv_C0
+        edge_factor = 0.5 if s == 0 else (Dh_C0 + Dh_C1)/s
         
-        return Delta_C0, Delta_C1
+        return Delta_C0, Delta_C1, edge_factor
     
     def set_mode(self, i ,j):
         '''
         * mode 0: |B| G   * mode 1: |G| B
-                    G  R              R  G
+                   G  R              R  G
         
         * mode 2: |G| R   * mode 3: |R| G
-                    B  G              G  B
+                   B  G              G  B
         '''
         return (i % 2) << 1 | (j % 2)
     
@@ -163,7 +170,7 @@ class MEPI:
                 
                 i, j, dy, dx = self.get_position(oy, ox)
                 mode = self.set_mode(i, j)
-                Delta_C0, Delta_C1 = self._Delta(i, j, dy, dx)
+                Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
                 
                 if mode == 0 or mode == 1:
                     output_delta[oy, ox, 1] = Delta_C0
@@ -182,10 +189,10 @@ class MEPI:
                 
                 i, j, dy, dx = self.get_position(oy, ox)
                 mode = self.set_mode(i, j)
-                Delta_C0, Delta_C1 = self._Delta(i, j, dy, dx)
+                Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
 
-                a = self.weight_cal(dy)
-                b = self.weight_cal(dx)
+                a = self.weight_cal(dy, gamma=2-edge)
+                b = self.weight_cal(dx, gamma=edge+1)
                 
                 arr = self.inputImage[i-1:i+3, j-1:j+3]
                 float_arr = arr.astype(nb.float64)
