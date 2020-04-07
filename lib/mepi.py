@@ -12,6 +12,7 @@ spec = [
     ('outputHeight', int64),
     ('inputImage', uint8[:, :]),
     ('scale', float64),
+    ('mode', uint8)
 ]
 
 @jitclass(spec)    
@@ -100,11 +101,27 @@ class MEPI:
     def _Delta(self, i, j , dy, dx):
         deltaH = np.zeros((8, 4))
         deltaV = np.zeros((8, 4))
+        Delta = np.zeros((4, 4))
 
         for m in range(-3, 5, 1):
             for n in range(-1, 3, 1):
                 deltaH[m+3, n+1] = self._DeltaH(i+m, j+n)
                 deltaV[m+3, n+1] = self._DeltaV(i+n, j+m)
+
+        Dh_C0 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
+        Dh_C1 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
+        
+        if self.is_green(i, j):
+            Dv_C0 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
+            Dv_C1 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
+        else:
+            Dv_C1 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
+            Dv_C0 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
+            
+        s = Dh_C1 + Dv_C1 + Dh_C0 + Dv_C0
+        edge_factor = 0.5 if s == 0 else (Dh_C0 + Dh_C1)/s
+        
+        #Delta = deltaH[2:6, :] * (1-edge_factor) + deltaV[2:6, :].T * edge_factor
 
         weight_h = self.weight_cal(dx)
         weight_v = self.weight_cal(dy/2, gamma=1)
@@ -113,9 +130,6 @@ class MEPI:
         deltaH_C0 = np.dot(deltaH_first, self.color_weight(weight_v, False))
         deltaH_C1 = np.dot(deltaH_first, self.color_weight(weight_v, True))
         
-        Dh_C0 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
-        Dh_C1 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
-        
         weight_h = self.weight_cal(dx/2, gamma=1)
         weight_v = self.weight_cal(dy)
         
@@ -123,22 +137,24 @@ class MEPI:
         deltaV_C0 = np.dot(deltaV_first, self.color_weight(weight_h, self.is_green(i, j)))
         deltaV_C1 = np.dot(deltaV_first, self.color_weight(weight_h, not self.is_green(i, j)))
         
-        if self.is_green(i, j):
-            Dv_C0 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
-            Dv_C1 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
-        else:
-            Dv_C1 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
-            Dv_C0 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
-        
         #Delta_C0 = deltaH_C0
         #Delta_C1 = deltaH_C1
         
         Delta_C0 = self.getDelta(deltaH_C0, deltaV_C0, Dh_C0, Dv_C0)
         Delta_C1 = self.getDelta(deltaH_C1, deltaV_C1, Dh_C1, Dv_C1)
-        s = Dh_C1 + Dv_C1 + Dh_C0 + Dv_C0
-        edge_factor = 0.5 if s == 0 else (Dh_C0 + Dh_C1)/s
         
-        return Delta_C0, Delta_C1, edge_factor
+        for m in range(-1, 3):
+            for n in range(-1, 3):
+                if not self.is_green(i+m, j+n):
+                    Delta[m+1, n+1] = self._DeltaV(i+m, j+n) * edge_factor + self._DeltaH(i+m, j+n) * (1-edge_factor)
+        
+        i_near = round(i + dy)
+        j_near = round(j + dx)
+        
+        if not self.is_green(i_near, j_near):
+            Delta[int((dy-0.25)*2)+1, int((dx-0.25)*2)+1] = Delta_C0 if dy < 0.5 else Delta_C1
+        
+        return Delta, Delta_C0, Delta_C1, edge_factor
     
     def set_mode(self, i ,j):
         '''
@@ -148,7 +164,7 @@ class MEPI:
         * mode 2: |G| R   * mode 3: |R| G
                    B  G              G  B
         '''
-        return (i % 2) << 1 | (j % 2)
+        self.mode = (i % 2) << 1 | (j % 2)
     
     def get_position(self, oy, ox):
         scale_factor = 1/self.scale
@@ -161,7 +177,7 @@ class MEPI:
         dy = y - float(i)
         
         return i, j, dy, dx
-    
+
     def Delta(self):
         output_delta = np.zeros((self.outputHeight, self.outputWidth, 2), dtype=np.int16)
         
@@ -169,8 +185,9 @@ class MEPI:
             for ox in range(10, self.outputWidth - 10):
                 
                 i, j, dy, dx = self.get_position(oy, ox)
-                mode = self.set_mode(i, j)
-                Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
+                self.set_mode(i, j)
+                mode = self.mode
+                det, Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
                 
                 if mode == 0 or mode == 1:
                     output_delta[oy, ox, 1] = Delta_C0
@@ -180,7 +197,7 @@ class MEPI:
                     output_delta[oy, ox, 1] = Delta_C1                             
 
         return output_delta
-
+    
     def Algorithm(self):
         outputImage = np.zeros((self.outputHeight, self.outputWidth, 3), dtype=np.uint8)
         
@@ -188,15 +205,17 @@ class MEPI:
             for ox in range(10, self.outputWidth - 10):
                 
                 i, j, dy, dx = self.get_position(oy, ox)
-                mode = self.set_mode(i, j)
-                Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
+                self.set_mode(i, j)
+                mode = self.mode
+                det, Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
 
-                a = self.weight_cal(dy, gamma=2-edge)
-                b = self.weight_cal(dx, gamma=edge+1)
+                a = self.weight_cal(dy, gamma=2.5-edge)
+                b = self.weight_cal(dx, gamma=edge+1.5)
                 
                 arr = self.inputImage[i-1:i+3, j-1:j+3]
                 float_arr = arr.astype(nb.float64)
                 
+                '''
                 if mode == 0 or mode == 3:
                     det = np.array([[Delta_C1, 0 ,Delta_C1, 0],
                                     [0, Delta_C0, 0, Delta_C0],
@@ -207,7 +226,15 @@ class MEPI:
                                     [Delta_C0, 0, Delta_C0, 0],
                                     [0 ,Delta_C1, 0, Delta_C1],
                                     [Delta_C0, 0, Delta_C0, 0]], dtype=nb.float64)
-
+                '''
+                '''
+                if mode == 0 or mode == 3:
+                    det[1, 1] = Delta_C0
+                    det[2, 2] = Delta_C1
+                else:
+                    det[1, 2] = Delta_C0
+                    det[2, 1] = Delta_C1
+                '''
                 float_arr = float_arr + det
                 temp = np.dot(a.reshape(1,4), float_arr)
                 epi  = np.dot(temp, b)
@@ -234,6 +261,15 @@ class MEPI:
                 outputImage[oy, ox, 1] = 255 if tempG > 255 else 0 if tempG < 0 else int(tempG)
                 outputImage[oy, ox, 0] = 255 if tempR > 255 else 0 if tempR < 0 else int(tempR)
                 outputImage[oy, ox, 2] = 255 if tempB > 255 else 0 if tempB < 0 else int(tempB)
+
+                if False:#oy == 341 and ox == 272:
+                    print(Delta_C0)
+                    print(arr)
+                    print(edge)
+                    print(outputImage[oy, ox, 1])
+                    print(float_arr)
+                    print(dy, dx)
+                    print(mode)
 
         return outputImage
         

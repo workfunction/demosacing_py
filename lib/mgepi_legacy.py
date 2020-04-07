@@ -26,12 +26,9 @@ class MGEPI:
         self.outputImage = np.zeros((self.outputHeight, self.outputWidth, 3), 
                                     dtype=np.uint8)
         self.mode = 0
-        
-    def is_green(self, i, j):
-        return (i%2) != (j%2)
 
-    def _DeltaH(self, i, j):
-        if self.is_green(i, j):
+    def _DeltaH(self, i, j, isGreen):
+        if isGreen == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i, j-2] / 4) +   \
                 (self.inputImage[i, j+2] / 4) - (self.inputImage[i, j-1] / 2) - \
                 (self.inputImage[i, j+1] / 2)
@@ -40,8 +37,8 @@ class MGEPI:
                 (self.inputImage[i, j-2] / 4) - (self.inputImage[i, j+2] / 4) - \
                 (self.inputImage[i, j] / 2)
 
-    def _DeltaV(self, i, j):
-        if self.is_green(i, j):
+    def _DeltaV(self, i, j, isGreen):
+        if isGreen == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i-2, j] / 4) +   \
                 (self.inputImage[i+2, j] / 4) - (self.inputImage[i-1, j] / 2) - \
                 (self.inputImage[i+1, j] / 2)
@@ -49,46 +46,27 @@ class MGEPI:
             return (self.inputImage[i-1, j] / 2) + (self.inputImage[i+1, j] / 2) - \
                 (self.inputImage[i-2, j] / 4) - (self.inputImage[i+2, j] / 4) - \
                 (self.inputImage[i, j] / 2)
-                
-    def getDelta(self, dh, dv, gh, gv):
-        s = gh + gv
-        if s == 0:
-            return dh
-        return (gh * dv + gv * dh) / s
-        
-    def _getDelta(self, dh, dv, gh, gv):
-        if gv <= gh:
-            if gv * 4 <= gh:
-                return dv
-            elif gv * 2 <= gh:
-                return (3 * dv + dh) / 4
-            else:
-                return (dv + dh) / 2
-        else:
-            if gh * 4 <= gv:
-                return dh
-            elif gh * 2 <= gv:
-                return (3 * dh + dv) / 4
-            else:
-                return (dh + dv) / 2
 
     def DeltaH(self, i, j):
+        c0 = self.mode == 1 or self.mode == 2
+        c1 = not c0
+
         # 求水平色差 #                
                 # 中 #
-        Delta_H0 = self._DeltaH(i, j-1)
-        Delta_H1 = self._DeltaH(i, j)
-        Delta_H2 = self._DeltaH(i, j+1)
-        Delta_H20 = self._DeltaH(i, j+2)
+        Delta_H0 = self._DeltaH(i, j-1, c1)
+        Delta_H1 = self._DeltaH(i, j, c0)
+        Delta_H2 = self._DeltaH(i, j+1, c1)
+        Delta_H20 = self._DeltaH(i, j+2, c0)
                 # 上 #
-        Delta_H3 = self._DeltaH(i-2, j-1)
-        Delta_H4 = self._DeltaH(i-2, j)
-        Delta_H5 = self._DeltaH(i-2, j+1)
-        Delta_H50 = self._DeltaH(i-2, j+2)
+        Delta_H3 = self._DeltaH(i-2, j-1, c1)
+        Delta_H4 = self._DeltaH(i-2, j, c0)
+        Delta_H5 = self._DeltaH(i-2, j+1, c1)
+        Delta_H50 = self._DeltaH(i-2, j+2, c0)
                 # 下 #
-        Delta_H6 = self._DeltaH(i+2, j-1)
-        Delta_H7 = self._DeltaH(i+2, j)
-        Delta_H8 = self._DeltaH(i+2, j+1)
-        Delta_H80 = self._DeltaH(i+2, j+2)
+        Delta_H6 = self._DeltaH(i+2, j-1, c1)
+        Delta_H7 = self._DeltaH(i+2, j, c0)
+        Delta_H8 = self._DeltaH(i+2, j+1, c1)
+        Delta_H80 = self._DeltaH(i+2, j+2, c0)
 
         Delta_H1_total = (-0.125 * Delta_H0 + 0.625 * Delta_H1 + 0.625 * Delta_H2 -0.125 * Delta_H20)
         Delta_H2_total = (-0.125 * Delta_H3 + 0.625 * Delta_H4 + 0.625 * Delta_H5 -0.125 * Delta_H50)
@@ -100,22 +78,25 @@ class MGEPI:
         return Delta_H_total, Dh_G
 
     def DeltaV(self, i, j):
+        c0 = self.mode == 1 or self.mode == 2
+        c1 = not c0
+        
         # 求垂直色差
                 # 中 #
-        Delta_V0 = self._DeltaV(i-1, j)
-        Delta_V1 = self._DeltaV(i, j)
-        Delta_V2 = self._DeltaV(i+1, j)
-        Delta_V20 = self._DeltaV(i+2, j)
+        Delta_V0 = self._DeltaV(i-1, j, c1)
+        Delta_V1 = self._DeltaV(i, j, c0)
+        Delta_V2 = self._DeltaV(i+1, j, c1)
+        Delta_V20 = self._DeltaV(i+2, j, c0)
                 # 左 #
-        Delta_V3 = self._DeltaV(i-1, j-2)
-        Delta_V4 = self._DeltaV(i, j-2)
-        Delta_V5 = self._DeltaV(i+1, j-2)
-        Delta_V50 = self._DeltaV(i+2, j-2)
+        Delta_V3 = self._DeltaV(i-1, j-2, c1)
+        Delta_V4 = self._DeltaV(i, j-2, c0)
+        Delta_V5 = self._DeltaV(i+1, j-2, c1)
+        Delta_V50 = self._DeltaV(i+2, j-2, c0)
                 #右 #
-        Delta_V6 = self._DeltaV(i-1, j+2)
-        Delta_V7 = self._DeltaV(i, j+2)
-        Delta_V8 = self._DeltaV(i+1, j+2)
-        Delta_V80 = self._DeltaV(i+2, j+2)
+        Delta_V6 = self._DeltaV(i-1, j+2, c1)
+        Delta_V7 = self._DeltaV(i, j+2, c0)
+        Delta_V8 = self._DeltaV(i+1, j+2, c1)
+        Delta_V80 = self._DeltaV(i+2, j+2, c0)
 
         Delta_V1_total = (-0.125 * Delta_V0 + 0.625 * Delta_V1 + 0.625 * Delta_V2 -0.125 * Delta_V20)
         Delta_V2_total = (-0.125 * Delta_V3 + 0.625 * Delta_V4 + 0.625 * Delta_V5 -0.125 * Delta_V50)
@@ -146,8 +127,20 @@ class MGEPI:
             Delta_V_total, Dv_G = self.DeltaV(i, j)
             
                 # 插補出G #
-            det = self.getDelta(Delta_H_total, Delta_V_total, Dh_G, Dv_G)
-            temp = inputImage[i, j] + det
+            if Dv_G <= Dh_G:
+                if Dv_G * 4 <= Dh_G:
+                    temp = inputImage[i, j] + Delta_V_total
+                elif Dv_G * 2 <= Dh_G:
+                    temp = inputImage[i, j] + (3 * Delta_V_total + Delta_H_total) / 4
+                else:
+                    temp = inputImage[i, j] + (Delta_V_total + Delta_H_total) / 2
+            else:
+                if Dh_G * 4 <= Dv_G:
+                    temp = inputImage[i, j] + Delta_H_total
+                elif Dh_G * 2 <= Dv_G:
+                    temp = inputImage[i, j] + (3 * Delta_H_total + Delta_V_total) / 4
+                else:
+                    temp = inputImage[i, j] + (Delta_H_total + Delta_V_total) / 2
 
             outImage[1] = 255 if temp > 255 else 0 if temp < 0 else temp
 
@@ -155,25 +148,38 @@ class MGEPI:
             # 補RB #
                 # 估計尚未插補的G值 #
                     # 左上 #
-            Delta_H0 = self._DeltaH(i-1, j-1)
-            Delta_V0 = self._DeltaV(i-1, j-1)
+            Delta_H0 = self._DeltaH(i-1, j-1, False)
+            Delta_V0 = self._DeltaV(i-1, j-1, False)
                     # 右上 #
-            Delta_H1 = self._DeltaH(i-1, j+1)
-            Delta_V1 = self._DeltaV(i-1, j+1)
+            Delta_H1 = self._DeltaH(i-1, j+1, False)
+            Delta_V1 = self._DeltaV(i-1, j+1, False)
                     # 左下 #
-            Delta_H2 = self._DeltaH(i+1, j-1)
-            Delta_V2 = self._DeltaV(i+1, j-1)
+            Delta_H2 = self._DeltaH(i+1, j-1, False)
+            Delta_V2 = self._DeltaV(i+1, j-1, False)
                     # 右下 #
-            Delta_H3 = self._DeltaH(i+1, j+1)
-            Delta_V3 = self._DeltaV(i+1, j+1)
+            Delta_H3 = self._DeltaH(i+1, j+1, False)
+            Delta_V3 = self._DeltaV(i+1, j+1, False)
 
             Delta_H_total = (Delta_H0 + Delta_H1 + Delta_H2 + Delta_H3) / 4
             Delta_V_total = (Delta_V0 + Delta_V1 + Delta_V2 + Delta_V3) / 4
             Dh_O = (abs(Delta_H0 - Delta_H1) + abs(Delta_H2 - Delta_H3)) / 2
             Dv_O = (abs(Delta_V0 - Delta_V2) + abs(Delta_V1 - Delta_V3)) / 2
 
-            det = self.getDelta(Delta_H_total, Delta_V_total, Dh_O, Dv_O)
-            temp = outImage[1] - det
+            if Dv_O <= Dh_O:
+                if Dv_O * 4 <= Dh_O:
+                    temp = outImage[1] - Delta_V_total
+                elif Dv_O * 2 <= Dh_O:
+                    temp = outImage[1] - (3 * Delta_V_total + Delta_H_total) / 4
+                else:
+                    temp = outImage[1] - (Delta_V_total + Delta_H_total) / 2
+            
+            else:
+                if Dh_O * 4 <= Dv_O:
+                    temp = outImage[1] - Delta_H_total
+                elif Dh_O * 2 <= Dv_O:
+                    temp = outImage[1] - (3 * Delta_H_total + Delta_V_total) / 4
+                else:
+                    temp = outImage[1] - (Delta_H_total + Delta_V_total) / 2                    
 
             outImage[(0 if self.mode == 0 else 2)] = 255 if temp > 255 else 0 if temp < 0 else temp
             outImage[(2 if self.mode == 0 else 0)] = inputImage[i, j]
@@ -183,42 +189,65 @@ class MGEPI:
             # 補G 上 RB #
                 # 估計B的G值 #
                     # 左 #
-            Delta_H1 = self._DeltaH(i, j-1)
-            Delta_V1 = self._DeltaV(i, j-1)
+            Delta_H1 = self._DeltaH(i, j-1, False)
+            Delta_V1 = self._DeltaV(i, j-1, False)
                     # 右 #
-            Delta_H2 = self._DeltaH(i, j+1)
-            Delta_V2 = self._DeltaV(i, j+1)
+            Delta_H2 = self._DeltaH(i, j+1, False)
+            Delta_V2 = self._DeltaV(i, j+1, False)
 
             Delta_H1_total = (Delta_H1 + Delta_H2) / 2
             Delta_V1_total = (Delta_V1 + Delta_V2) / 2
 
-            det = self.getDelta(Delta_H1_total, Delta_V1_total, Dh_G, Dv_G)
-            temp = inputImage[i, j] - det
+            if Dv_G <= Dh_G:                    
+                if Dv_G * 4 <= Dh_G:
+                    temp = inputImage[i, j] - Delta_V1_total
+                elif Dv_G * 2 <= Dh_G:
+                    temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
+                else:
+                    temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
+            
+            else:                    
+                if Dh_G * 4 <= Dv_G:
+                    temp = inputImage[i, j] - Delta_H1_total
+                elif Dh_G * 2 <= Dv_G:
+                    temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
+                else:
+                    temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
             
             outImage[(2 if self.mode == 1 else 0)] = 255 if temp > 255 else 0 if temp < 0 else temp
             
                 # 估計R的G值 #
                     # 上 #
-            Delta_H1 = self._DeltaH(i-1, j)
-            Delta_V1 = self._DeltaV(i-1, j)
+            Delta_H1 = self._DeltaH(i-1, j, False)
+            Delta_V1 = self._DeltaV(i-1, j, False)
                     # 下 #
-            Delta_H2 = self._DeltaH(i+1, j)
-            Delta_V2 = self._DeltaV(i+1, j)
+            Delta_H2 = self._DeltaH(i+1, j, False)
+            Delta_V2 = self._DeltaV(i+1, j, False)
 
             Delta_H1_total = (Delta_H1 + Delta_H2) / 2
             Delta_V1_total = (Delta_V1 + Delta_V2) / 2
 
-            det = self.getDelta(Delta_H1_total, Delta_V1_total, Dh_G, Dv_G)
-            temp = inputImage[i, j] - det
+            if Dv_G <= Dh_G:                    
+                if Dv_G * 4 <= Dh_G:
+                    temp = inputImage[i, j] - Delta_V1_total
+                elif Dv_G * 2 <= Dh_G:
+                    temp = inputImage[i, j] - (3 * Delta_V1_total + Delta_H1_total) / 4
+                else:
+                    temp = inputImage[i, j] - (Delta_V1_total + Delta_H1_total) / 2
+            
+            else:                    
+                if Dh_G * 4 <= Dv_G:
+                    temp = inputImage[i, j] - Delta_H1_total
+                elif Dh_G * 2 <= Dv_G:
+                    temp = inputImage[i, j] - (3 * Delta_H1_total + Delta_V1_total) / 4
+                else:
+                    temp = inputImage[i, j] - (Delta_H1_total + Delta_V1_total) / 2
             
             outImage[(0 if self.mode == 1 else 2)] = 255 if temp > 255 else 0 if temp < 0 else temp
             outImage[1] = inputImage[i, j]
             # 補G 上 RB #
-        
-        s = Dh_G + Dv_G
-        edge_factor = 0.5 if s == 0 else Dh_G / s
 
-        return outImage, edge_factor
+        return outImage
     
     def weight_cal(self, vs, gamma=2):
         x_gamma = gamma/2
@@ -235,7 +264,6 @@ class MGEPI:
 
     def Algorithm(self):
         tempWindow = np.zeros((4, 4, 3), dtype=np.uint8)
-        edge = np.zeros((4, 4))
         for oy in range(self.outputHeight - 7):
             for ox in range(5, self.outputWidth - 5):
                 x = (ox + 0.5) * (1/self.scale) - 0.5
@@ -248,12 +276,10 @@ class MGEPI:
                 
                 for m in range(4):
                     for n in range(4):
-                        tempWindow[m, n], edge[m, n] = self.mgbi(i-1+m, j-1+n)
+                        tempWindow[m, n] = self.mgbi(i-1+m, j-1+n)
                         
-                e = np.sum(edge[1:3, 1:3])/4
-                
-                a1, a2, a3, a4 = self.weight_cal(dy, 2.5-e)
-                b1, b2, b3, b4 = self.weight_cal(dx, e+1.5)
+                a1, a2, a3, a4 = self.weight_cal(dy)
+                b1, b2, b3, b4 = self.weight_cal(dx)
 
                 for color in range(3):
                     in1 = tempWindow[0, 0, color] * a1 + tempWindow[1, 0, color] * a2 + \
