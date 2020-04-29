@@ -1,1 +1,1 @@
-pip install tensorflow numpy matplotlib pillow numba
+pip install tensorflow numpy matplotlib pillow numba scipy colorama

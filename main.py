@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import multiprocessing as mp
 
 from PIL import Image
+
+# * Algorithms
 from lib.mepi import MEPI
 from lib.mepi_legacy import MEPL
 from lib.mosaic import Mosaic
@@ -22,7 +24,6 @@ from lib.mgepi import MGEPI
 def read_img(img):
 	return tf.convert_to_tensor(img, dtype=np.uint8)
 
-@tf.function
 def do_psnr(tf_img1, tf_img2):
 	return tf.image.psnr(tf_img1, tf_img2, max_val=255)
 
@@ -46,15 +47,16 @@ def run(path):
 
     mos = Mosaic(image, im.width, im.height)
     mimage = mos.Algorithm()
+    
+    # * Change the algorithm here
+    epi = MGEPI(mimage, 2)
 
     if config["DELT"] == True:
-        epi = MEPI(mimage, 2)
         out = epi.Delta()
         config["SHOW"] = True
         config["SHOWG"] = True
         config["SAVE"] = False
     else:
-        epi = MEPI(mimage, 2)
         out = epi.Algorithm()
     
     if config["CROP"] == False:
@@ -72,10 +74,11 @@ def run(path):
         if config["SHOWG"] == True:
             if config["DELT"] == True:
                 plt.imshow(out[...,0], cmap='hsv', vmin=-255, vmax=255)
+                plt.show()
             else:
                 plt.imshow(out[...,1], cmap='hsv', vmin=0, vmax=255)
-            plt.show()
-            assert False
+                plt.show()
+                assert False
         else:
             plt.imshow(out)
         plt.show()
@@ -122,6 +125,9 @@ def main():
     else:
         with open('config.json', 'r') as f:
             config = json.load(f)
+            
+    if not os.path.exists("result"):
+        os.mkdir("result")
     
     num_cores = mp.cpu_count()
     if len(files) > 1:
