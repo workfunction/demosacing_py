@@ -1,6 +1,6 @@
 import numpy as np
 import numba as nb
-from numba import jitclass
+from numba.experimental import jitclass
 from numba import uint8
 
 spec = [

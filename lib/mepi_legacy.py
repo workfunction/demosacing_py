@@ -1,6 +1,6 @@
 import numpy as np
 import numba as nb
-from numba import jitclass
+from numba.experimental import jitclass
 from numba import int64
 from numba import uint8
 from numba import float64
@@ -50,9 +50,12 @@ class MEPL:
         vc2 = (d * (2 - d))/r
 
         return np.array([vc0, vc1, vc2])
+    
+    def is_green(self, i, j):
+        return (i%2) != (j%2)
 
-    def _DeltaH(self, i, j, isGreen=False):
-        if isGreen == True:
+    def _DeltaH(self, i, j):
+        if self.is_green(i, j) == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i, j-2] / 4) +   \
                 (self.inputImage[i, j+2] / 4) - (self.inputImage[i, j-1] / 2) - \
                 (self.inputImage[i, j+1] / 2)
@@ -61,8 +64,8 @@ class MEPL:
                 (self.inputImage[i, j-2] / 4) - (self.inputImage[i, j+2] / 4) - \
                 (self.inputImage[i, j] / 2)
 
-    def _DeltaV(self, i, j, isGreen=False):
-        if isGreen == True:
+    def _DeltaV(self, i, j):
+        if self.is_green(i, j) == True:
             return (self.inputImage[i, j] / 2) + (self.inputImage[i-2, j] / 4) +   \
                 (self.inputImage[i+2, j] / 4) - (self.inputImage[i-1, j] / 2) - \
                 (self.inputImage[i+1, j] / 2)
@@ -71,12 +74,12 @@ class MEPL:
                 (self.inputImage[i-2, j] / 4) - (self.inputImage[i+2, j] / 4) - \
                 (self.inputImage[i, j] / 2)
 
-    def DeltaH(self, i, j, dx, dy, isGreen, ioffset=0, joffset=0):
+    def DeltaH(self, i, j, dx, dy, ioffset=0, joffset=0):
         delta = np.empty((4, 4))
 
         for m in range(4):
             for n in range(4):
-                delta[m, n] = self._DeltaH(i+(m-ioffset-1)*2, j+(n-joffset-1), isGreen==bool((n-joffset)%2))
+                delta[m, n] = self._DeltaH(i+(m-ioffset-1)*2, j+(n-joffset-1))
 
         a = self.weight_cal(dx)
         b = self.weight_cal(dy/2)
@@ -87,12 +90,12 @@ class MEPL:
 
         return Delta_H_total, Dh_G
 
-    def DeltaV(self, i, j, dy, dx, isGreen, ioffset=0, joffset=0):
+    def DeltaV(self, i, j, dy, dx, ioffset=0, joffset=0):
         delta = np.empty((4, 4))
 
         for m in range(4):
             for n in range(4):
-                delta[m,n] = self._DeltaV(i+(n-ioffset-1), j+(m-joffset-1)*2, isGreen==bool((n-ioffset)%2))
+                delta[m,n] = self._DeltaV(i+(n-ioffset-1), j+(m-joffset-1)*2)
         
         a = self.weight_cal(dy)
         b = self.weight_cal(dx/2)
@@ -143,18 +146,18 @@ class MEPL:
                 self.mode = (i % 2) << 1 | (j % 2)
 
                 if self.mode == 0 or self.mode == 3:
-                    Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy, False)
-                    Delta_V_C0, Dv_C0 = self.DeltaV(i, j, dy, dx, False)                
+                    Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy)
+                    Delta_V_C0, Dv_C0 = self.DeltaV(i, j, dy, dx)                
 
-                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, True, joffset=1)
-                    Delta_V_C1, Dv_C1 = self.DeltaV(i, j+1, dy, 1-dx, True, ioffset=1)                
+                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, joffset=1)
+                    Delta_V_C1, Dv_C1 = self.DeltaV(i, j+1, dy, 1-dx, ioffset=1)                
                 
                 else:
-                    Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy, True)
-                    Delta_V_C1, Dv_C1 = self.DeltaV(i, j, dy, dx, True)                
+                    Delta_H_C0, Dh_C0 = self.DeltaH(i, j, dx, dy)
+                    Delta_V_C1, Dv_C1 = self.DeltaV(i, j, dy, dx)                
 
-                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, False, joffset=1)
-                    Delta_V_C0, Dv_C0 = self.DeltaV(i, j+1, dy, 1-dx, False, ioffset=1)
+                    Delta_H_C1, Dh_C1 = self.DeltaH(i+1, j, dx, 1-dy, joffset=1)
+                    Delta_V_C0, Dv_C0 = self.DeltaV(i, j+1, dy, 1-dx, ioffset=1)
                 
                 Delta_C0 = self.getDelta(Delta_H_C0, Delta_V_C0, Dh_C0, Dv_C0)
                 Delta_C1 = self.getDelta(Delta_H_C1, Delta_V_C1, Dh_C1, Dv_C1)

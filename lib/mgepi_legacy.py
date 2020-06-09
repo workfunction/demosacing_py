@@ -1,6 +1,6 @@
 import numpy as np
 import numba as nb
-from numba import jitclass
+from numba.experimental import jitclass
 
 spec = [
     ('width', nb.int64),

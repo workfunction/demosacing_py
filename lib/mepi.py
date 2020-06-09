@@ -1,6 +1,6 @@
 import numpy as np
 import numba as nb
-from numba import jitclass
+from numba.experimental import jitclass
 from numba import int64
 from numba import uint8
 from numba import float64
@@ -28,6 +28,13 @@ class MEPI:
         
     def is_green(self, i, j):
         return (i%2) != (j%2)
+    
+    def __weight_cal(self, vs, gamma=0):
+
+        if vs == 1:
+            return np.array([0.10151382, -0.30232316, 1.0731945, 0.15881203, -0.031327657])
+        else:
+            return np.array([-0.031327657, 0.15881203, 1.0731945, -0.30232316, 0.10151382])
 
     def weight_cal(self, vs, gamma=1.5):
         x_gamma = gamma/2
@@ -76,7 +83,28 @@ class MEPI:
         else:
             return np.array([weight[0], 0, weight[1], 0, weight[2], 0, weight[3], 0])
         
-    def getDelta(self, dh, dv, gh, gv):
+    def getDelta(self, dh, dv, gh, gv, eh=0, ev=0):
+        '''
+        if np.abs(dh - dv) > 20:
+            return -300#dh if eh/(gh*gh) > ev/(gv*gv) else dv
+        '''
+        s = gh + gv
+        if 4*gh < gv:
+            return dh
+        elif 4*gv < gh:
+            return dv
+        #elif eh > 4*ev:
+        #    return -300
+        #elif ev > 4*eh:
+        #    return 300
+        #elif np.abs(dh - dv) > 20:
+        #    return dh# if eh/(gh*gh) > ev/(gv*gv) else dv
+        elif s == 0:
+            return (dh + dv) / 2
+        else:
+            return (gh * dv + gv * dh) / s
+        
+    def __getDelta(self, dh, dv, gh, gv):
         s = gh + gv
         if s == 0:
             return dh
@@ -101,37 +129,39 @@ class MEPI:
     def _Delta(self, i, j , dy, dx):
         deltaH = np.zeros((8, 4))
         deltaV = np.zeros((8, 4))
-        Delta = np.zeros((4, 4))
+        Delta_green = np.zeros((4, 4))
+        Delta_color = np.zeros((4, 4, 2))
 
         for m in range(-3, 5, 1):
             for n in range(-1, 3, 1):
                 deltaH[m+3, n+1] = self._DeltaH(i+m, j+n)
                 deltaV[m+3, n+1] = self._DeltaV(i+n, j+m)
 
-        Dh_C0 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
-        Dh_C1 = np.dot(np.abs(deltaH[:, 0] - deltaH[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
+        Dh = np.dot((np.abs(deltaH[2:6, 0] - deltaH[2:6, 2]) + np.abs(deltaH[2:6, 1] - deltaH[2:6, 3])), np.array([1/8, 3/8, 3/8, 1/8]))        
+        Dhv = np.dot((np.abs(deltaH[2, :] - deltaH[4, :]) + np.abs(deltaH[3, :] - deltaH[5, :])), np.array([1/8, 3/8, 3/8, 1/8]))        
+
+        Dv = np.dot((np.abs(deltaV[2:6, 0] - deltaV[2:6, 2]) + np.abs(deltaV[2:6, 1] - deltaV[2:6, 3])), np.array([1/8, 3/8, 3/8, 1/8]))
+        Dvh = np.dot((np.abs(deltaH[2, :] - deltaH[4, :]) + np.abs(deltaH[3, :] - deltaH[5, :])), np.array([1/8, 3/8, 3/8, 1/8]))        
         
-        if self.is_green(i, j):
-            Dv_C0 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
-            Dv_C1 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
-        else:
-            Dv_C1 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([0, 1/8, 0, 3/8, 0, 3/8, 0, 1/8]))
-            Dv_C0 = np.dot(np.abs(deltaV[:, 0] - deltaV[:, 3]), np.array([1/8, 0, 3/8, 0, 3/8, 0, 1/8, 0]))
-            
-        s = Dh_C1 + Dv_C1 + Dh_C0 + Dv_C0
-        edge_factor = 0.5 if s == 0 else (Dh_C0 + Dh_C1)/s
+        Eh = Dhv if Dh == 0 else Dhv / Dh 
+        Ev = Dvh if Dv == 0 else Dvh / Dv
+        
+        s = Dh + Dv
+        edge_factor = 0.5 if s == 0 else Dh/s
         
         #Delta = deltaH[2:6, :] * (1-edge_factor) + deltaV[2:6, :].T * edge_factor
 
-        weight_h = self.weight_cal(dx)
-        weight_v = self.weight_cal(dy/2, gamma=1)
+        ga = 2
+
+        weight_h = self.weight_cal(dx ,gamma=ga*edge_factor)
+        weight_v = self.weight_cal(dy/2, gamma=(ga*(1-edge_factor)))
 
         deltaH_first = np.dot(deltaH, weight_h)
         deltaH_C0 = np.dot(deltaH_first, self.color_weight(weight_v, False))
         deltaH_C1 = np.dot(deltaH_first, self.color_weight(weight_v, True))
         
-        weight_h = self.weight_cal(dx/2, gamma=1)
-        weight_v = self.weight_cal(dy)
+        weight_h = self.weight_cal(dx/2, gamma=ga*edge_factor)
+        weight_v = self.weight_cal(dy, gamma=ga*(1-edge_factor))
         
         deltaV_first = np.dot(deltaV, weight_v)
         deltaV_C0 = np.dot(deltaV_first, self.color_weight(weight_h, self.is_green(i, j)))
@@ -140,21 +170,28 @@ class MEPI:
         #Delta_C0 = deltaH_C0
         #Delta_C1 = deltaH_C1
         
-        Delta_C0 = self.getDelta(deltaH_C0, deltaV_C0, Dh_C0, Dv_C0)
-        Delta_C1 = self.getDelta(deltaH_C1, deltaV_C1, Dh_C1, Dv_C1)
+        Delta_C0 = self.getDelta(deltaH_C0, deltaV_C0, Dh, Dv, Eh, Ev)
+        Delta_C1 = self.getDelta(deltaH_C1, deltaV_C1, Dh, Dv, Eh, Ev)
         
         for m in range(-1, 3):
             for n in range(-1, 3):
                 if not self.is_green(i+m, j+n):
-                    Delta[m+1, n+1] = self._DeltaV(i+m, j+n) * edge_factor + self._DeltaH(i+m, j+n) * (1-edge_factor)
+                    Delta_green[m+1, n+1] = self.getDelta(self._DeltaH(i+m, j+n), self._DeltaV(i+m, j+n), Dh, Dv, Eh, Ev)
+                    
+        for m in range(-1, 3):
+            for n in range(-1, 3):
+                if self.is_green(i+m, j+n):
+                    Delta_color[m+1, n+1, 1] = self._DeltaH(i+m, j+n)
+                    Delta_color[m+1, n+1, 2] = self._DeltaV(i+m, j+n)
         
+        '''
         i_near = round(i + dy)
         j_near = round(j + dx)
         
         if not self.is_green(i_near, j_near):
             Delta[int((dy-0.25)*2)+1, int((dx-0.25)*2)+1] = Delta_C0 if dy < 0.5 else Delta_C1
-        
-        return Delta, Delta_C0, Delta_C1, edge_factor
+        '''
+        return Delta_green, Delta_color, Delta_C0, Delta_C1, edge_factor
     
     def set_mode(self, i ,j):
         '''
@@ -187,7 +224,7 @@ class MEPI:
                 i, j, dy, dx = self.get_position(oy, ox)
                 self.set_mode(i, j)
                 mode = self.mode
-                det, Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
+                det, dc, Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
                 
                 if mode == 0 or mode == 1:
                     output_delta[oy, ox, 1] = Delta_C0
@@ -207,13 +244,13 @@ class MEPI:
                 i, j, dy, dx = self.get_position(oy, ox)
                 self.set_mode(i, j)
                 mode = self.mode
-                det, Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
+                det, det_c, Delta_C0, Delta_C1, edge = self._Delta(i, j, dy, dx)
 
-                a = self.weight_cal(dy, gamma=2.5-edge)
-                b = self.weight_cal(dx, gamma=edge+1.5)
+                a = self.weight_cal(dy, gamma=5*(1-edge))#2.5-edge)
+                b = self.weight_cal(dx, gamma=5*edge)#edge+1.5)
                 
-                arr = self.inputImage[i-1:i+3, j-1:j+3]
-                float_arr = arr.astype(nb.float64)
+                orig = self.inputImage[i-1:i+3, j-1:j+3]
+                mosaic = orig.astype(nb.float64)
                 
                 '''
                 if mode == 0 or mode == 3:
@@ -235,11 +272,19 @@ class MEPI:
                     det[1, 2] = Delta_C0
                     det[2, 1] = Delta_C1
                 '''
-                float_arr = float_arr + det
-                temp = np.dot(a.reshape(1,4), float_arr)
-                epi  = np.dot(temp, b)
+                green = mosaic + det
+                '''
+                color_H = np.zeros((4, 4))
+                color_V = np.zeros((4, 4))
                 
-                tempG = np.sum(epi)
+                for i in range(4):
+                    color_0[i ,:] = mosaic[i, :] + det_c[i, :, (i+1)%2]
+                    color_1[i ,:] = mosaic[i, :] + det_c[i, :, (i+1)%2]
+                epi_color = np.dot(color, b)
+                '''
+                epi_green = np.dot(np.dot(a.reshape(1,4), green), b)                
+                
+                tempG = np.sum(epi_green)
                 
                 if mode == 0:
                     tempB = tempG - Delta_C0
@@ -257,17 +302,33 @@ class MEPI:
                     tempR = 0
                     tempG = 0
                     tempB = 0
-
+                '''
+                if oy == 341 and ox == 309:
+                    tempR = 0
+                    tempG = 0
+                    tempB = 0
+                '''
                 outputImage[oy, ox, 1] = 255 if tempG > 255 else 0 if tempG < 0 else int(tempG)
                 outputImage[oy, ox, 0] = 255 if tempR > 255 else 0 if tempR < 0 else int(tempR)
                 outputImage[oy, ox, 2] = 255 if tempB > 255 else 0 if tempB < 0 else int(tempB)
 
-                if False:#oy == 341 and ox == 272:
+                if oy == 293 and ox == 310:
+                    print("293, 310")
                     print(Delta_C0)
-                    print(arr)
+                    print(Delta_C1)
                     print(edge)
-                    print(outputImage[oy, ox, 1])
-                    print(float_arr)
+                    print(outputImage[oy, ox])
+                    print(green)
+                    print(dy, dx)
+                    print(mode)
+                    
+                if oy == 294 and ox == 310:
+                    print("294, 310")
+                    print(Delta_C0)
+                    print(Delta_C1)
+                    print(edge)
+                    print(outputImage[oy, ox])
+                    print(green)
                     print(dy, dx)
                     print(mode)
 
