@@ -7,3 +7,8 @@ model
 T91
 data
 remote
+IMAX
+kodim
+test
+config.json
+*.sh
