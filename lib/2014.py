@@ -12,6 +12,8 @@ import copy
 import cv2 as cv
 import sys, os
 import multiprocessing as mp
+import tensorflow as tf
+import matplotlib.pyplot as plt
 
 
 def bayer_reverse(img):
@@ -41,13 +43,13 @@ def ACPIgreenH(CFA):
 
     # Interpolate the missing green samples at blue sampling positions
     for i in range(3,nRow-1,2):
-        for j in range(2,nCol-2,2):
+        for j in range(2,nCol-3,2):
             a = CFA[i, j-1]+CFA[i, j+1]
             b = 2*CFA[i, j]-CFA[i, j-2]-CFA[i, j+2]
             green[i, j] = a/2+b/2       
 
     # Interpolate the missing green samples at red sampling positions
-    for i in range(2,nRow-2,2):
+    for i in range(2,nRow-3,2):
         for j in range(3,nCol-1,2):
             a = CFA[i, j-1]+CFA[i, j+1]
             b = 2*CFA[i, j]-CFA[i, j-2]-CFA[i, j+2]
@@ -65,14 +67,14 @@ def ACPIgreenV(CFA):
 
     # Interpolate the missing green samples at blue sampling positions
     for i in range(3,nRow-1,2):
-        for j in range(2,nCol-2,2):
+        for j in range(2,nCol-3,2):
             a = CFA[i-1, j]+CFA[i+1, j]
             b = 2*CFA[i, j]-CFA[i-2, j]-CFA[i+2, j]
             green[i, j] = a/2+b/2
 
 
     # Interpolate the missing green samples at red sampling positions
-    for i in range(2,nRow-2,2):
+    for i in range(2,nRow-3,2):
         for j in range(3,nCol-1,2):	
             a = CFA[i-1, j]+CFA[i+1, j]
             b = 2*CFA[i, j]-CFA[i-2, j]-CFA[i+2, j]
@@ -109,14 +111,14 @@ def jointDDFWgreen(CFA,gh,gv):
     DeltaV = np.zeros([nRow, nCol])
 
     # positions of red pixels
-    for i in range(2,nRow-2,2):
+    for i in range(2,nRow-3,2):
         for j in range(3,nCol-1,2): 
             DeltaH[i,j] = DH[i-2,j-2]+DH[i-2,j]+DH[i,j-2]+DH[i,j]+DH[i+2,j-2]+DH[i+2,j]+DH[i-1,j-1]+DH[i+1,j-1]   
             DeltaV[i,j] = DV[i-2,j-2]+DV[i-2,j]+DV[i-2,j+2]+DV[i,j-2]+DV[i,j]+DV[i,j+2]+DV[i-1,j-1]+DV[i-1,j+1]
     
     # positions of blue pixels
     for i in range(3,nRow-1,2):
-        for j in range(2,nCol-2,2): 	
+        for j in range(2,nCol-3,2): 	
             DeltaH[i,j] = DH[i-2,j-2]+DH[i-2,j]+DH[i,j-2]+DH[i,j]+DH[i+2,j-2]+DH[i+2,j]+DH[i-1,j-1]+DH[i+1,j-1]   
             DeltaV[i,j] = DV[i-2,j-2]+DV[i-2,j]+DV[i-2,j+2]+DV[i,j-2]+DV[i,j]+DV[i,j+2]+DV[i-1,j-1]+DV[i-1,j+1]
 
@@ -125,7 +127,7 @@ def jointDDFWgreen(CFA,gh,gv):
     # Decide between the horizontal and vertical interpolations
     T = 1.5
 
-    for i in range(2,nRow-2,2):
+    for i in range(2,nRow-3,2):
         for j in range(3,nCol-1,2):
             if (1+DeltaH[i,j])/(1+DeltaV[i,j])>T:
                 G[i,j] = gv[i,j] # vertical strong edge
@@ -147,7 +149,7 @@ def jointDDFWgreen(CFA,gh,gv):
        
 
     for i in range(3,nRow-1,2):
-        for j in range(2,nCol-2,2):
+        for j in range(2,nCol-3,2):
             if (1+DeltaH[i,j])/(1+DeltaV[i,j])>T:
                 G[i,j] = gv[i,j] # vertical strong edge
                 DM[i,j] = 1
@@ -200,7 +202,7 @@ def DDFW_RG_diff(CFA,green):
     KR = CFA-green
 
     for i in range(3,nRow-3,2):
-        for j in range(4,nCol-2,2):
+        for j in range(4,nCol-3,2):
             # Compute the weights of two diagonal directions
             w = DDFWweights(KR,i,j,2)
             
@@ -212,8 +214,8 @@ def DDFW_RG_diff(CFA,green):
 
     # Interpolate red/green color difference values at green sampling positions
 
-    for i in range(4,nRow-2,2):
-        for j in range(4,nCol-2,2):
+    for i in range(4,nRow-3,2):
+        for j in range(4,nCol-3,2):
             
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KR,i,j,1)
@@ -244,7 +246,7 @@ def DDFW_BG_diff(CFA,green):
     KB = np.zeros([nRow,nCol])
     KB = CFA-green
 
-    for i in range(4,nRow-2,2):
+    for i in range(4,nRow-3,2):
         for j in range(3,nCol-3,2):	    
         # Compute the weights of two diagonal directions
             w = DDFWweights(KB,i,j,2)
@@ -258,8 +260,8 @@ def DDFW_BG_diff(CFA,green):
 
     # Interpolate blue/green color difference values at green sampling positions
 
-    for i in range(4,nRow-2,2):
-        for j in range(4,nCol-2,2):
+    for i in range(4,nRow-3,2):
+        for j in range(4,nCol-3,2):
             
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KB,i,j,1)
@@ -284,7 +286,7 @@ def DDFW_BG_diff(CFA,green):
     return KB
 
 
-def DDFW_refine_green(CFA,KR,KB):
+def DDFW_refine_green(CFA,KR,KB, DM):
 
     # Read the image size
     nRow, nCol = CFA.shape
@@ -294,7 +296,7 @@ def DDFW_refine_green(CFA,KR,KB):
 
     # Refine green samples at red sampling positions
 
-    for i in range(4,nRow-2,2):
+    for i in range(4,nRow-3,2):
         for j in range(3,nCol-3,2):        
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KR,i,j,1)
@@ -304,11 +306,13 @@ def DDFW_refine_green(CFA,KR,KB):
             b = w[0]+w[1]+w[2]+w[3]
             G[i,j] = CFA[i,j] - a/b
             
+            #DM[i, j] = (w[0] + w[2]) / b
+            
     
     # Refine green samples at blue sampling positions
 
     for i in range(3,nRow-3,2):
-        for j in range(4,nCol-2,2):    
+        for j in range(4,nCol-3,2):    
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KB,i,j,1)
             
@@ -316,10 +320,12 @@ def DDFW_refine_green(CFA,KR,KB):
             a = KB[i,j-1]*w[0]+KB[i+1,j]*w[1]+KB[i,j+1]*w[2]+KB[i-1,j]*w[3]
             b = w[0]+w[1]+w[2]+w[3]
             G[i,j] = CFA[i,j] - a/b
-    return G    
+            
+            DM[i, j] = (w[0] + w[2]) / b
+    return G, DM
 
 
-def DDFW_refine_RG_diff(KR):
+def DDFW_refine_RG_diff(KR, DM):
     # Refine the red/green color difference plane.
 
     nRow, nCol = KR.shape
@@ -327,7 +333,7 @@ def DDFW_refine_RG_diff(KR):
     # Refine red/green color difference values at blue sampling positions
 
     for i in range(3,nRow-3,2):
-        for j in range(4,nCol-2,2):        
+        for j in range(4,nCol-3,2):        
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KR,i,j,1)
             
@@ -339,8 +345,8 @@ def DDFW_refine_RG_diff(KR):
 
     # Refine red/green color difference values at green sampling positions
 
-    for i in range(4,nRow-2,2):
-        for j in range(4,nCol-2,2):            
+    for i in range(4,nRow-3,2):
+        for j in range(4,nCol-3,2):            
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KR,i,j,1)
             
@@ -359,17 +365,17 @@ def DDFW_refine_RG_diff(KR):
             a = KR[i,j-1]*w[0]+KR[i+1,j]*w[1]+KR[i,j+1]*w[2]+KR[i-1,j]*w[3]
             b = w[0]+w[1]+w[2]+w[3]
             KR[i,j] = a/b
-    return KR
+    return KR, DM
 
 
 
-def DDFW_refine_BG_diff(KB):
+def DDFW_refine_BG_diff(KB, DM):
 
     nRow, nCol = KB.shape
 
     # Refine blue/green color difference values at red sampling positions
 
-    for i in range(4,nRow-2,2):
+    for i in range(4,nRow-3,2):
         for j in range(3,nCol-3,2):        
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KB,i,j,1)
@@ -379,11 +385,12 @@ def DDFW_refine_BG_diff(KB):
             b = w[0]+w[1]+w[2]+w[3]
             KB[i,j] = a/b
             
+            DM[i, j] = (w[0] + w[2]) / b
 
     # Refine blue/green color difference values at green sampling positions
  
-    for i in range(4,nRow-2,2):
-        for j in range(4,nCol-2,2):            
+    for i in range(4,nRow-3,2):
+        for j in range(4,nCol-3,2):            
             # Compute the weights of horizontal and vertical directions
             w = DDFWweights(KB,i,j,1)
             
@@ -391,6 +398,8 @@ def DDFW_refine_BG_diff(KB):
             a = KB[i,j-1]*w[0]+KB[i+1,j]*w[1]+KB[i,j+1]*w[2]+KB[i-1,j]*w[3]
             b = w[0]+w[1]+w[2]+w[3]
             KB[i,j] = a/b
+            
+            DM[i, j] = (w[0] + w[2]) / b
             
      
     for i in range(3,nRow-3,2):
@@ -402,7 +411,9 @@ def DDFW_refine_BG_diff(KB):
             a = KB[i,j-1]*w[0]+KB[i+1,j]*w[1]+KB[i,j+1]*w[2]+KB[i-1,j]*w[3]
             b = w[0]+w[1]+w[2]+w[3]
             KB[i,j] = a/b
-    return KB
+            
+            DM[i, j] = (w[0] + w[2]) / b
+    return KB, DM
 
 def RoundImage(img):
     nRow, nCol,c = img.shape
@@ -431,13 +442,106 @@ def RoundImage(img):
     cv.imwrite('output.png',img)
     return img
 
+def is_green(i, j):
+    return (i%2) == (j%2)
 
-def jointDDFW(CFA):
-    # Interpolate the green plane
-    gh = ACPIgreenH(CFA) # horizontally interpolated green image
-    gv = ACPIgreenV(CFA) # vertically interpolated green image
+def _DeltaH(CFA, i, j):
+    if is_green(i, j):
+        return (CFA[i, j] / 2) + (CFA[i, j-2] / 4) +   \
+            (CFA[i, j+2] / 4) - (CFA[i, j-1] / 2) - \
+            (CFA[i, j+1] / 2)
+    else:
+        return (CFA[i, j-1] / 2) + (CFA[i, j+1] / 2) - \
+            (CFA[i, j-2] / 4) - (CFA[i, j+2] / 4) - \
+            (CFA[i, j] / 2)
+
+def _DeltaV(CFA, i, j):        
+    if is_green(i, j):
+        return (CFA[i, j] / 2) + (CFA[i-2, j] / 4) +   \
+            (CFA[i+2, j] / 4) - (CFA[i-1, j] / 2) - \
+            (CFA[i+1, j] / 2)
+    else:
+        return (CFA[i-1, j] / 2) + (CFA[i+1, j] / 2) - \
+            (CFA[i-2, j] / 4) - (CFA[i+2, j] / 4) - \
+            (CFA[i, j] / 2)
+
+def getDelta(dh, dv, gh, gv):        
+    if gv <= gh:
+        if gv * 4 <= gh:
+            return dv
+        elif gv * 2 <= gh:
+            return (3 * dv + dh) / 4
+        else:
+            return (dv + dh) / 2
+    else:
+        if gh * 4 <= gv:
+            return dh
+        elif gh * 2 <= gv:
+            return (3 * dh + dv) / 4
+        else:
+            return (dh + dv) / 2
+
+def MGBI_green(CFA):
+    nRow, nCol = CFA.shape
+    out = np.copy(CFA)
     
-    G0, DM = jointDDFWgreen(CFA,gh,gv)
+    # Compute DeltaH and DeltaV
+    DeltaH = np.zeros([nRow, nCol])
+    DeltaV = np.zeros([nRow, nCol])
+    
+    for i in range(2, nRow-3):
+        for j in range(2, nCol-3):
+            DeltaH[i, j] = _DeltaH(CFA, i, j)
+            DeltaV[i, j] = _DeltaV(CFA, i, j)
+
+    # Interpolation G
+    for i in range(3, nRow-3):
+        for j in range(3, nCol-3):
+            if not is_green(i, j):
+                Delta_H = np.zeros((3, 3))
+                Delta_V = np.zeros((3, 3))
+                
+                for m in range(0, 3):
+                    for n in range(0, 3):
+                        Delta_H[m, n] = DeltaH[i+2*(m-1), j+(n-1)]
+                        Delta_V[m, n] = DeltaV[i+(m-1), j+2*(n-1)]
+                
+                Gh = np.dot(np.abs(Delta_H[:, 0] - Delta_H[:, 1]) + 
+                            np.abs(Delta_H[:, 1] - Delta_H[:, 2]), 
+                            np.array([0.25, 0.5, 0.25]))                
+                Gv = np.dot(np.abs(Delta_V[0, :] - Delta_V[1, :]) + 
+                            np.abs(Delta_V[1, :] - Delta_V[2, :]), 
+                            np.array([0.25, 0.5, 0.25]))
+
+                tmp_H = np.dot(np.array([0.05, 0.9, 0.05]), Delta_H)
+                Dh = np.dot(tmp_H, np.array([0.05, 0.9, 0.05]))      
+                tmp_V = np.dot(np.array([0.05, 0.9, 0.05]), Delta_V)
+                Dv = np.dot(tmp_V, np.array([0.05, 0.9, 0.05]))  
+                
+                D = getDelta(Dh, Dv, Gh, Gv)
+                
+                # 插補出G #
+                temp = CFA[i, j] + D
+                out[i, j] = 255 if temp > 255 else 0 if temp < 0 else temp
+
+    return out
+
+
+def jointDDFW(CFA, name):
+    # Interpolate the green plane
+    #gh = ACPIgreenH(CFA) # horizontally interpolated green image
+    #gv = ACPIgreenV(CFA) # vertically interpolated green image
+    DM = np.zeros(CFA.shape)
+    
+    #G0, DM = jointDDFWgreen(CFA,gh,gv)
+    G0 = MGBI_green(CFA)
+    #print('../result/'+ name.split('.')[0] +'_2x.png')
+    #MGBI = cv.imread('../result/'+ name.split('.')[0] +'_2x.png')
+    #G0 = MGBI[:, :, 1]
+    
+    #plt.imshow(np.abs(G1-G0), cmap='hsv', vmin=0, vmax=30)
+    #plt.show()
+    #cv.imwrite(name.split('.')[0] +'_2x.png', MGBI)
 
     # Interpolate color difference planes
 
@@ -446,9 +550,9 @@ def jointDDFW(CFA):
     
     # Refine the estimates
 
-    G = DDFW_refine_green(CFA,KR,KB)
-    KR = DDFW_refine_RG_diff(KR+G0-G)
-    KB = DDFW_refine_BG_diff(KB+G0-G)
+    G, DM = DDFW_refine_green(CFA,KR,KB, DM)
+    KR, DM = DDFW_refine_RG_diff(KR+G0-G, DM)
+    KB, DM = DDFW_refine_BG_diff(KB+G0-G, DM)
 
     
     # Generate the demosaicked result
@@ -670,16 +774,15 @@ def jointZoom(img,DM,k,T):
     
     return out
 
-def epiZoom(img):
+def epi5Zoom(img, DM):
     h, w, c = img.shape
     out = np.zeros((h*2, w*2, 3), dtype=np.uint8)
     window = np.zeros((5, 5, 3), dtype=np.uint8)
     
-    
-    #odd = np.array([0.10151382, -0.30232316, 1.0731945, 0.15881203, -0.031327657])
-    #eve = np.array([-0.031327657, 0.15881203, 1.0731945, -0.30232316, 0.10151382])
-    odd = np.array([0.13411383, -0.4630759, 1.2877634, 0.08989102, -0.04809369])
-    eve = np.array([-0.04809369, 0.08989102, 1.2877634, -0.4630759, 0.13411383])
+    gamma = np.array([0.15, -0.75, 1, -0.28, -0.12])
+    base_linear = np.array([0.10151382, -0.30232316, 1.0731945, 0.15881203, -0.031327657])
+    base_cubic  = np.array([0.13411383, -0.46307590, 1.2877634, 0.08989102, -0.048093690])
+    base = base_linear - 0.1*gamma
     
     for oy in range(4, (h*2)-4):
         for ox in range(4, (w*2)-4):
@@ -691,8 +794,67 @@ def epiZoom(img):
                     for n in range(5):
                         window[m, n, :] = img[i-2+m, j-2+n, :]
             
-            b = odd if (ox % 2) == 1 else eve
-            a = odd if (oy % 2) == 1 else eve
+            b = base if (ox % 2) == 1 else np.flip(base)
+            a = base if (oy % 2) == 1 else np.flip(base)
+            
+            for color in range(3):
+                ori = window[:, :, color].astype(np.float64)
+                temp = round(np.dot(np.dot(a, ori), b))
+                    
+                temp *= (temp>0)
+                if temp > 255 :
+                    temp = 255
+
+                out[oy, ox, color] = temp
+                
+    return out
+
+def epiWeight(vs, gamma=2):
+        x_gamma = gamma/2
+        
+        tmp = (1-vs)
+        vc3 = (tmp*vs*vs)*x_gamma
+        vc0 = (tmp*tmp*vs)*x_gamma
+        vc1 = tmp + 2*vc0 - 1*vc3
+        vc2 = vs + 2*vc3 - 1*vc0
+        vc0 = (-1)*vc0
+        vc3 = (-1)*vc3
+
+        return np.array([vc0, vc1, vc2, vc3])
+
+def epiZoom(img, DM):
+    h, w, c = img.shape
+    out = np.zeros((h*2, w*2, 3), dtype=np.uint8)
+    window = np.zeros((4, 4, 3), dtype=np.uint8)
+    g = 1.5
+    r = 1
+    
+    g1 = 1
+    r1 = 0.5
+    
+    for oy in range(5, (h*2)-5):
+        for ox in range(5, (w*2)-5):
+            x = (ox + 0.5) * (0.5) - 0.5
+            y = (oy + 0.5) * (0.5) - 0.5
+            
+            j = int(x)	#i = floor(x) 
+            i = int(y) #j = floor(y)
+            dx = x - float(j)
+            dy = y - float(i)
+            
+            nj = int((ox)/2)
+            ni = int((oy)/2)
+            
+            for m in range(4):
+                    for n in range(4):
+                        window[m, n, :] = img[i-1+m, j-1+n, :]
+
+            if not is_green(ni, nj):
+                b = epiWeight(dx, g1 + r1*(1-DM[ni, nj]))
+                a = epiWeight(dy, g1 + r1*DM[ni, nj])
+            else:
+                b = epiWeight(dx, g + r*(1-DM[ni, nj]))
+                a = epiWeight(dy, g + r*DM[ni, nj])
             
             for color in range(3):
                 ori = window[:, :, color].astype(np.float64)
@@ -714,20 +876,25 @@ def DZ(CFA, name):
     k = 5
     T = 1.15
 
-    d_out, DM = jointDDFW(CFA)
+    d_out, DM = jointDDFW(CFA, name)
     cv.imwrite('DDFW_' + name + '.png', d_out)
+    plt.imshow(DM, cmap='hsv', vmin=0, vmax=1)
+    plt.show()
     w,h = CFA.shape
-    test = cv.resize(d_out,(2*h,2*w),interpolation=cv.INTER_CUBIC)
+    
+    #test = cv.resize(d_out,(2*h,2*w),interpolation=cv.INTER_CUBIC)
     #test = cv.resize(d_out,(2*h,2*w),interpolation=cv.INTER_LINEAR)
     
-    cv.imwrite('good.png',test)
+    #cv.imwrite('good.png',test)
     
     #OUT = jointZoom(d_out/255, DM, k, T)
     #OUT = RoundImage(OUT*255)
     #OUT = jointZoom(d_out, DM, k, T)
-    OUT = epiZoom(d_out)
+    #OUT = epiZoom(d_out, DM)
+    OUT = d_out
+    #OUT = cv.resize(d_out,(2*h,2*w),interpolation=cv.INTER_CUBIC)
     
-    return OUT,test
+    return OUT
 
 
 
@@ -760,39 +927,58 @@ def get_cpsnr(RGB1,RGB2,b):
 
     return CPSNR
 
+def read_img(img):
+	return tf.convert_to_tensor(img[:, :, 0:3], dtype=np.uint8)
+
+def do_psnr(tf_img1, tf_img2):
+	return tf.image.psnr(tf_img1, tf_img2, max_val=255)
+
 def run(path):
     img = cv.imread(path)
-    name = os.path.basename(path)
-    cols,rows,h = img.shape
+    name = os.path.basename(path).split('.')[0]
+    rows,cols,h = img.shape
     
     #zoom = np.zeros([math.floor(cols/2),math.floor(rows/2)])
     
+    print(img.shape)
+    print((math.floor(rows/2),math.floor(cols/2)))
+    
+    if (rows % 2) == 1:
+        rows = rows - 1
+    if (cols % 2) == 1:
+        cols = cols - 1
+    
     #####################################
-    zoom = cv.resize(img,(math.floor(rows/2),math.floor(cols/2)),interpolation=cv.INTER_LINEAR)
+    zoom = cv.resize(img[0:rows, 0:cols, :],(math.floor(cols/2),math.floor(rows/2)),interpolation=cv.INTER_LINEAR)
     #zoom = cv.resize(img,(math.floor(rows/2),math.floor(cols/2)),interpolation=cv.INTER_CUBIC)
     #zoom = img[0:cols-1:2,0:rows-1:2] 
+    #zoom = img
+    img = zoom
     #####################################
+    
     tmp = bayer_reverse(zoom)
     cv.imwrite('tmp.bmp',tmp)
     
-    out,test = DZ(tmp, name)
-    cv.imwrite('output_'+name,out)
-    out = test
-    b=12
+    out = DZ(tmp, name)
+    cv.imwrite('output_' + name + '.png',out)
+    #out = test
+    b=14
     
     MSE_R, MSE_G, MSE_B, CPSNR, PSNR_R, PSNR_G, PSNR_B = cpsnr_calc(img,out,b)
-    print('MSE_R = %lf ' %MSE_R)
-    print('MSE_G = %lf ' %MSE_G)
-    print('MSE_B = %lf ' %MSE_B)
-    print('CPSNR = %lf ' %CPSNR)
-    print('PSNR_R = %lf ' %PSNR_R)
-    print('PSNR_G = %lf ' %PSNR_G)
-    print('PSNR_B = %lf ' %PSNR_B)
+    #print('MSE_R = %lf ' %MSE_R)
+    #print('MSE_G = %lf ' %MSE_G)
+    #print('MSE_B = %lf ' %MSE_B)
+    #print('CPSNR = %lf ' %CPSNR)
+    #print('PSNR_R = %lf ' %PSNR_R)
+    #print('PSNR_G = %lf ' %PSNR_G)
+    #print('PSNR_B = %lf ' %PSNR_B)
     
     CPSNR = get_cpsnr(img,out,b)
 
+    #p = float(do_psnr(read_img(img[b:-1-b,b:-1-b,:]), read_img(out[b:-1-b,b:-1-b,:])))
 
     print('CPSNR = %lf ' %CPSNR)
+    #print(p)
     
 
     '''
@@ -829,16 +1015,20 @@ def main():
     print(*files, sep="\n")
     print("============================")
     
-    num_cores = mp.cpu_count()
+    if len(files) != 1:    
+        num_cores = mp.cpu_count()
+        
+        pool = mp.Pool(processes=(num_cores if len(files) > num_cores else len(files)))
+        ss = np.array(pool.map(run, files)) 
+        pool.close()  
+        pool.join()
+        
+        for s in ss:
+            print(s)
+        print(np.average(ss))
     
-    pool = mp.Pool(processes=(num_cores if len(files) > num_cores else len(files)))
-    ss = np.array(pool.map(run, files)) 
-    pool.close()  
-    pool.join()
-    
-    for s in ss:
-        print(s)
-    print(np.average(ss))
+    else:
+        print(run(files[0]))
 
 if __name__ == '__main__':
     main()

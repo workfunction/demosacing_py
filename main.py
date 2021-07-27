@@ -14,13 +14,27 @@ import multiprocessing as mp
 
 from PIL import Image
 
-# * Algorithms
-from lib.mepi import MEPI
-from lib.mepi_legacy import MEPL
-from lib.mosaic import Mosaic
+# * [Demosaicking] 富仲學長方法
+# * Efficient VLSI architecture for edge-oriented demosaicking
 from lib.mgbi5 import MGBI_5
+
+# * [Joint] 我的方法
+# * A low-complexity joint method for demosaicking and scaling algorithm 
 from lib.mgepi import MGEPI
+
+# * [Joint] JMSC(2014) *B1/B2*
+# * Joint demosaicking and zoomingusing moderate spectral correlation
+# * and consistent edge map
 from lib.msc import MSC
+
+# * [Joint] 富仲學長方法 + EPI
+from lib.mepi import MEPI
+
+# * [Joint] 富仲學長方法 + EPI
+from lib.mepi_legacy import MEPL
+
+# * [Tools] 把原圖馬賽克化
+from lib.mosaic import Mosaic
 
 def read_img(img):
 	return tf.convert_to_tensor(img[:, :, 0:3], dtype=np.uint8)
@@ -70,8 +84,8 @@ def run(path):
         #################################
         #   Change the algorithm here   #
         #################################
-        #out = epi.Demosaic()
-        out = epi.Algorithm()
+        out = epi.Demosaic()
+        #out = epi.Algorithm()
     
     if config["CROP"] == False:
         #補原圖

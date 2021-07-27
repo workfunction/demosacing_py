@@ -293,10 +293,51 @@ class MGEPI:
 
         return [vc0, vc1, vc2, vc3]
     
+    def kb(self, cfa, color):
+        return (cfa[1] - cfa[color])
+    
+    def refine(self, window, i, j):
+        '''
+        * mode 0: |B| G   * mode 1: |G| B
+                   G  R              R  G
+        
+        * mode 2: |G| R   * mode 3: |R| G
+                   B  G              G  B
+        '''
+        mode = int(i % 2) * 2 + int(j % 2)
+        c = 2 if mode < 2 else 0 # R row or B row
+        w = np.zeros((4), dtype=np.float64)
+        r = 0.5
+        ret = np.copy(window)
+        window = window.astype(np.float64)
+        
+        if mode == 0:
+            for m in range(1, 3):
+                for n in range(1, 3):
+                    if m==2 and n==2:
+                        c = 0
+                        # right
+                        w[0] = 1 / (1 + (np.abs(window[m, n, c] - self.inputImage[i+m-1, j+n-1-2]) + r * np.abs(self.kb(window[m, n-1], c) - self.kb(window[m, n+1], c))))
+                        # left      1.5 (  np.np.)
+                        w[1] = 1 / (1 + (np.abs(window[m, n, c] - self.inputImage[i+m-1, j+n-1+2]) + r * np.abs(self.kb(window[m, n-1], c) - self.kb(window[m, n+1], c))))
+                        # top       1.5 (  np.np.)
+                        w[2] = 1 / (1 + (np.abs(window[m, n, c] - self.inputImage[i+m-1-2, j+n-1]) + r * np.abs(self.kb(window[m-1, n], c) - self.kb(window[m+1, n], c))))
+                        # bottom    1.5 (  np.    np.)
+                        w[3] = 1 / (1 + (np.abs(window[m, n, c] - self.inputImage[i+m-1+2, j+n-1]) + r * np.abs(self.kb(window[m-1, n], c) - self.kb(window[m+1, n], c))))
+                        
+                        s = np.sum(w)
+                        
+                        kk = np.array([self.kb(window[m, n-1], c), self.kb(window[m, n+1], c), 
+                                    self.kb(window[m-1, n], c), self.kb(window[m+1, n], c)], dtype=np.float64)
+                        k = np.dot(kk, w) / s
+                        temp = window[m, n, c] + k
+                        ret[1, 1, 1] = 255 if temp > 255 else 0 if temp < 0 else np.uint8(temp)
+        return ret
+    
     def Demosaic(self):
         self.outputImage = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        for oy in range(7, self.height - 7):
-            for ox in range(5, self.width - 5):
+        for oy in range(4, self.height - 4):
+            for ox in range(4, self.width - 4):
                 self.outputImage[oy, ox], e = self.mgbi(oy, ox)
         
         return self.outputImage
@@ -304,13 +345,14 @@ class MGEPI:
     def Algorithm(self):
         scale_factor_h = 0.5
         scale_factor_v = 0.5
-        wsize = 5
+        wsize = 4
         c = 2.5
         s = 2.5
         
         gamma = np.array([0.15, -0.75, 1, -0.3, -0.1])
         base_linear = np.array([0.10151382, -0.30232316, 1.0731945, 0.15881203, -0.031327657])
-        base = np.array([0.13411383, -0.46307590, 1.2877634, 0.08989102, -0.048093690])
+        base_cubic  = np.array([0.13411383, -0.46307590, 1.2877634, 0.08989102, -0.048093690])
+        base = base_linear
         
         tempWindow = np.zeros((wsize, wsize, 3), dtype=np.uint8)
         edge = np.zeros((wsize, wsize))
@@ -357,6 +399,8 @@ class MGEPI:
                     for m in range(wsize):
                         for n in range(wsize):
                             tempWindow[m, n], edge[m, n] = self.mgbi(i-1+m, j-1+n)
+                            
+                    tempWindow = self.refine(tempWindow, i, j)
                             
                     e = np.sum(edge[1:3, 1:3])/4
                 
